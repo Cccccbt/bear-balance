@@ -21,6 +21,7 @@ img{max-width:100%}
   --honey:#e3a83c; --honey-ink:#2a1c06;
   --paper:#efe8d8; --paper-edge:#d3c9b1;
   --lo:#3d6e8f; --hi:#b3432a;
+  --swap:#6fb6dc; --swap-ink:#0b2230;
   --good:#86c896; --bad:#e8826a; --tie:#d2bd6c;
   --shade:rgba(4,10,7,.55); --scrim:rgba(6,14,10,.78);
   --f-display:"ZCOOL XiaoWei","Songti SC","STSong","SimSun",serif;
@@ -76,7 +77,20 @@ button.card:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
 .hand.idle .card{filter:saturate(.55) brightness(.82)}
 .hand button.card.sel,.hand button.card.sel:hover{transform:translateY(-10px);box-shadow:0 0 0 2px var(--honey),0 10px 18px -8px var(--shade)}
 .hand button.card.sel::before{content:"出";position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:var(--honey);color:var(--honey-ink);font-family:var(--f-body);font-size:12px;display:grid;place-items:center;opacity:1;z-index:1}
-.hand.mull button.card.sel::before{content:"换"}
+.hand.mull button.card.sel::before{content:"换";background:var(--swap);color:var(--swap-ink)}
+.phase{display:inline-flex;align-items:center;gap:8px;padding:5px 18px 5px 12px;border-radius:999px;border:1.5px solid currentColor;font-family:var(--f-display);font-size:20px;letter-spacing:.14em;line-height:1.2}
+.phase svg{width:20px;height:20px;flex:none}
+.phase small{font-family:var(--f-body);font-size:12px;letter-spacing:.04em;opacity:.85}
+.phase:empty{display:none}
+.phase.mull{color:var(--swap);background:color-mix(in oklab,var(--swap) 13%,transparent)}
+.phase.play{color:var(--honey);background:color-mix(in oklab,var(--honey) 13%,transparent)}
+.phase.auto{color:var(--tie);background:color-mix(in oklab,var(--tie) 13%,transparent)}
+.phase.idle{color:var(--muted)}
+.app.ph-mull #mySide{border-color:var(--swap);border-style:dashed;box-shadow:0 0 0 1px color-mix(in oklab,var(--swap) 40%,transparent);background:color-mix(in oklab,var(--swap) 8%,var(--felt))}
+.app.ph-mull .board{opacity:.35}
+.app.ph-mull .hand button.card:not([disabled]){box-shadow:0 0 0 2px color-mix(in oklab,var(--swap) 75%,transparent)}
+.app.ph-mull .hand button.card.sel,.app.ph-mull .hand button.card.sel:hover{box-shadow:0 0 0 3px var(--swap),0 10px 18px -8px var(--shade)}
+.app.ph-play #mySide.turn{background:color-mix(in oklab,var(--honey) 7%,var(--felt))}
 .btn.rps{min-width:76px;font-size:16px}
 .card.new{animation:drop .38s cubic-bezier(.2,1.3,.5,1) both}
 @keyframes drop{from{transform:translateY(-14px) scale(1.08);opacity:0}to{transform:none;opacity:1}}
@@ -96,7 +110,7 @@ button.card:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
 .pan .lbl{font-size:11px;color:var(--muted);letter-spacing:.1em}
 .status{text-align:center;min-height:3em;max-width:46ch;font-size:17px;color:var(--ink);text-wrap:balance}
 .status .note{display:block;color:var(--muted);font-size:12.5px}
-.status .swapleft{display:block;width:max-content;margin:0 auto 6px;padding:3px 16px;border-radius:999px;background:var(--honey);color:var(--honey-ink);font-size:15px;font-weight:600;letter-spacing:.04em}
+.status .swapleft{display:block;width:max-content;margin:0 auto 6px;padding:3px 16px;border-radius:999px;background:var(--swap);color:var(--swap-ink);font-size:15px;font-weight:600;letter-spacing:.04em}
 .status .swapleft b{font-family:var(--f-num);font-size:21px;font-weight:400;margin-inline:2px}
 .status .clock{display:block;margin-top:4px;font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .status .clock.urgent{color:var(--bad);font-weight:600}
@@ -193,7 +207,7 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" id="app">
   <header class="top">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <h1>熊之平衡</h1><span class="mode-tag" id="modeTag">人机</span>
@@ -219,6 +233,7 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
       <div class="pan l" id="panL"><div class="str"></div><div class="bowl"><div class="num" id="totP">0</div><div class="lbl">你</div></div></div>
       <div class="pan r" id="panR"><div class="str"></div><div class="bowl"><div class="num" id="totA">0</div><div class="lbl">对手</div></div></div>
     </div>
+    <div class="phase" id="phase"></div>
     <div class="status" id="status" role="status" aria-live="polite"></div>
     <div class="actions" id="actions"></div>
   </section>
@@ -338,26 +353,13 @@ function aiStyle(){
   return S.aiP;
 }
 function aiMulligan(){
-  const P=aiStyle(),p=S.pl.a,off=S.round===1?P.m1:S.round===2?P.m2:0;let n=0;
+  const P=aiStyle(),p=S.pl.a,off=isFinal()?0:S.round===1?P.m1:P.m2;let n=0;
   while(p.swaps>0&&p.deck.length){
     const avg=sum(p.deck)/p.deck.length;
     if(p.hand[0]<avg+off){swapCard('a',p.hand[0]);n++;}else break;
   }
   if(n)L('a',`调度了 ${n} 次`);
   endMull('a');S.mdone.a=true;
-}
-// 预计第三局点数：手牌 + 抽牌期望 + 换牌收益
-function r3Expect(H,D,room){
-  const d=Math.min(3,room,D.length),da=D.length?sum(D)/D.length:0;
-  let t=sum(H)+d*da,sw=2+(3-Math.min(3,room)),left=D.length-d;
-  for(const c of H.slice().sort((x,y)=>x-y)){if(sw<=0||left<=0||c>=da)break;t+=da-c;sw--;left--;}
-  return t;
-}
-function oppR3(p){
-  const pl=new Set(p.played),U=[];for(let v=1;v<=16;v++)if(!pl.has(v))U.push(v);
-  const h=p.hand.length;let t=0;
-  for(let i=0;i<12;i++){shuffle(U);t+=r3Expect(U.slice(0,h),U.slice(h),10-h);}
-  return t/12;
 }
 function aiDecide(){
   const P=aiStyle(),me=S.pl.a,op=S.pl.p,hand=me.hand.slice().sort((x,y)=>x-y);
@@ -379,24 +381,11 @@ function aiDecide(){
     if(P.tie1&&d>0&&hand.includes(d)&&spent+d<=P.B1)return d;
     return dump();
   }
-  const wm=S.wins.a,wo=S.wins.p;
-  if(wm>=1&&wo>=1){ // 决胜局：全押
-    if(!hand.length||(op.passed&&d<0))return null;
-    if(op.passed){const c=atLeast(d+1);if(c!==undefined)return c;const t=atLeast(d);return t!==undefined?t:hand[hand.length-1];}
-    return hand[hand.length-1];
-  }
-  const m=r3Expect(me.hand,me.deck,10-me.hand.length)-oppR3(op);
-  if(wm>wo){ // 领先：第二局打平即胜
-    if(op.passed){if(d<=0)return null;const t=atLeast(d);return t===undefined?null:t;}
-    if(d<=0)return m>=P.sL?null:(hand.length?hand[0]:null);
-    if(m>=P.sL){const j=dump();return j!==null&&j<d?j:null;}
-    const t=atLeast(d);return t===undefined?null:t;
-  }
-  // 落后：第二、三局都要赢
-  if(op.passed){if(d<0)return null;const c=atLeast(d+1);return c===undefined?null:c;}
-  if(d<0)return(m>=P.sT+4||!hand.length)?null:hand[0];
-  // 落后时永不认输：只要还能反超就跟
-  const c=atLeast(d+1);return c===undefined?null:c;
+  // 第二局是赛点：不放弃。只有对手已经放弃、自己已经够赢（领先方打平即可）才停手
+  const need=S.wins.a>S.wins.p?d:d+1;
+  if(!hand.length||(op.passed&&need<=0))return null;
+  if(need<=0)return hand[0];
+  const c=atLeast(need);return c!==undefined?c:hand[hand.length-1];
 }
 function aiAct(){
   if(S.mode!=='ai'||S.phase!=='play'||S.turn!=='a')return;
@@ -408,10 +397,11 @@ function doneMull(w){
   endMull(w);S.mdone[w]=true;S.notes[w]='';
   if(S.mdone.p&&S.mdone.a)startPlay();else update();
 }
+const isFinal=()=>S.round===3||(S.wins.p>=1&&S.wins.a>=1);
 function startPlay(){
   disarm();
   S.notes={p:'',a:''};
-  if(S.round===3){autoR3();return;}
+  if(isFinal()){autoR3();return;}
   S.phase='play';S.turn=S.first;
   L(S.first,'先出牌',true,`第${CN[S.round-1]}局开始，`);
   schedule();
@@ -463,7 +453,7 @@ function nextRound(){
     const room=Math.max(0,10-p.hand.length),d=Math.min(3,room),got=draw(w,d);
     p.swaps=2+(3-d);sortHand(w);
     const m=`抽 ${got} 张，可换 ${p.swaps} 次`;
-    S.notes[w]=`本局你${m}。`;L(w,m);
+    S.notes[w]=`本局你${m}。`+(isFinal()?'这是决胜局，换完牌后双方手牌会全部自动打出。':'');L(w,m);
     S.mdone[w]=!(p.swaps>0&&p.deck.length);
     if(S.mdone[w])endMull(w);
   }
@@ -474,7 +464,7 @@ function nextRound(){
 function autoR3(){
   S.phase='auto';
   for(const w of['p','a']){const p=S.pl[w];p.board=[...p.hand];p.played.push(...p.hand);p.hand=[];p.passed=true;}
-  L(null,'双方手牌全部自动打出',true,'第三局：');
+  L(null,'双方手牌全部自动打出',true,`第${CN[S.round-1]}局是决胜局：`);
   update();const g=S;setTimeout(()=>{if(S===g)endRound();},1400);
 }
 function resign(w){if(S.phase==='over')return;disarm();S.phase='over';S.ended=w;S.ready={p:false,a:false};L(w,'认输',true);update();}
@@ -692,7 +682,19 @@ function render(){
   $('#oppBoard').innerHTML=boardHTML(V,'a',animate);$('#myBoard').innerHTML=boardHTML(V,'p',animate);
   if(V.fresh)UI.animN=V.fresh.n;
   $('#oppSide').classList.toggle('turn',V.phase==='play'&&V.turn==='a');
-  $('#mySide').classList.toggle('turn',(V.phase==='play'&&V.turn==='p')||V.phase==='mull');
+  $('#mySide').classList.toggle('turn',V.phase==='play'&&V.turn==='p');
+  const PH={mull:'mull',waitMull:'mull',play:'play',auto:'auto'}[V.phase]||'idle';
+  const app=$('#app');app.classList.toggle('ph-mull',PH==='mull');app.classList.toggle('ph-play',PH==='play');
+  const ICO_SWAP='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13l-4-4M20 16H7l4 4"/></svg>';
+  const ICO_PLAY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 8v8M8 12l4 4 4-4" stroke-linecap="round"/></svg>';
+  const rn=`第${CN[V.round-1]}局`;
+  const phHTML={mull:`${ICO_SWAP}${rn} · 换牌阶段${V.phase==='waitMull'?'<small>等待对手</small>':''}`,
+    play:`${ICO_PLAY}${rn} · 出牌阶段<small>${V.turn==='p'&&!P.passed?'轮到你':V.turn==='a'&&!A.passed?'对手出牌中':''}</small>`,
+    auto:`${ICO_PLAY}${rn} · 决胜局自动出牌`,
+    idle:V.phase==='rps'||V.phase==='waitRps'?'决定先后手':''}[PH];
+  const phEl=$('#phase');
+  if(phEl.innerHTML!==phHTML){phEl.innerHTML=phHTML;phEl.className='phase '+PH;
+    const pk=PH+V.round;if(UI.phKey!==pk){UI.phKey=pk;if(!reduced()&&PH!=='idle')phEl.animate([{transform:'scale(1.35)',opacity:0},{transform:'scale(.95)',opacity:1,offset:.6},{transform:'none'}],{duration:480,easing:'cubic-bezier(.2,1.2,.4,1)'});}}
 
   const canSwap=V.phase==='mull'&&P.swaps>0&&P.deck.length>0;
   const canPlay=V.phase==='play'&&V.turn==='p'&&!V.busy&&!P.passed;
@@ -732,7 +734,7 @@ function render(){
     if(V.turn==='p')st=A.passed?'对手已放弃。你可以继续出牌，或放弃结束本局。':'轮到你：点一张牌打出，或放弃跟牌。';
     else st=P.passed?'你已放弃，对手还可以继续出牌…':(V.mode==='ai'?'对手思考中…':'<span class="spin"></span>等待对手出牌…');
     if(canPlay)acts=`<button class="btn ghost" id="passBtn" type="button">放弃跟牌</button>`;
-  }else if(V.phase==='auto')st='第三局：双方所有手牌一次性自动打出。';
+  }else if(V.phase==='auto')st=`第${CN[V.round-1]}局是决胜局：双方所有手牌一次性自动打出。`;
   else if(V.phase==='roundEnd'||V.phase==='over')st='本局结束。';
   if(online&&!['over','wait','rps','waitRps'].includes(V.phase))acts+=`<button class="btn ghost" id="resign" type="button">${UI.confirmResign?'确认认输':'认输'}</button>`;
   if(V.phase==='over'&&!overlayFor(V))acts=`<button class="btn" id="readyBtn" type="button" ${V.ready.p?'disabled':''}>${V.ready.p?'等待对手…':'再来一局'}</button>`;
@@ -892,7 +894,7 @@ const RULES=`<ul>
   <li>先手在第一局场上直接获得 3 点。之后每局由上一局赢家先手（平局不变）。</li>
   <li>双方交替出牌，每次一张；也可以放弃跟牌。放弃后本局不能再出，对手仍可继续。</li>
   <li>第二、三局开始时各抽 3 张，之后可换牌 2 次；抽牌超出手牌上限的部分，额外变成换牌次数。</li>
-  <li>第三局所有手牌自动一次性打出。三局两胜，平局时双方都算赢这一局。</li>
+  <li>决胜局（第三局，或第一局打平后的第二局）换完牌后，所有手牌自动一次性打出。三局两胜，平局时双方都算赢这一局。</li>
 </ul>`;
 let lastKey='',lastFoot=null;
 function renderOverlay(V){
@@ -938,7 +940,7 @@ function renderOverlay(V){
         :`<span class="muted" id="autoNext" style="align-self:center;font-variant-numeric:tabular-nums">3 秒后自动开始</span><button class="btn" id="readyBtn" type="button">立即开始第${CN[V.round]}局</button>${V.ready.a&&UI.role!=='ai'?'<span class="muted" style="align-self:center">对手已准备</span>':''}`;
       key='re'+V.round+'-'+V.results.length;
       h=`<h2>第${CN[V.round-1]}局结算</h2>${st.html}
-      <p class="muted fadein" style="margin:0;text-align:center;animation-delay:${footDelay-150}ms">总比分 你 ${V.wins.p} : ${V.wins.a} 对手 · 下一局${V.first==='p'?'你':'对手'}先手${V.round===2?' · 第三局手牌将自动打出':''}</p>`;
+      <p class="muted fadein" style="margin:0;text-align:center;animation-delay:${footDelay-150}ms">总比分 你 ${V.wins.p} : ${V.wins.a} 对手 · ${(V.round>=2||(V.wins.p>=1&&V.wins.a>=1))?'下一局是决胜局，双方手牌将自动打出':`下一局${V.first==='p'?'你':'对手'}先手`}</p>`;
     }else{
       const w=V.wins;let fin,fc;
       if(V.ended){fin=V.ended==='p'?'你认输了':'对手认输，你赢了';fc=V.ended==='p'?'lose':'win';}
