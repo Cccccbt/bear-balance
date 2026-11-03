@@ -373,8 +373,8 @@ function aiDecide(){
   // 落后：第二、三局都要赢
   if(op.passed){if(d<0)return null;const c=atLeast(d+1);return c===undefined?null:c;}
   if(d<0)return(m>=P.sT+4||!hand.length)?null:hand[0];
-  const c=atLeast(d+1);if(c===undefined)return null;
-  return m-c>=P.sT?c:null;
+  // 落后时永不认输：只要还能反超就跟
+  const c=atLeast(d+1);return c===undefined?null:c;
 }
 function aiAct(){
   if(S.mode!=='ai'||S.phase!=='play'||S.turn!=='a')return;
