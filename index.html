@@ -136,6 +136,8 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
 .modes .full{grid-column:1/-1}
 .join{grid-column:1/-1;display:flex;gap:8px}
 .join input{flex:1;min-width:0;font:inherit;font-family:var(--f-num);font-size:18px;letter-spacing:.2em;text-transform:uppercase;padding:7px 12px;border-radius:999px;border:1.5px solid var(--rail-2);background:var(--felt);color:var(--ink)}
+.join input{caret-color:var(--honey)}
+.join input::placeholder{color:var(--muted);letter-spacing:.06em;font-family:var(--f-body);font-size:14px;text-transform:none}
 .join input:focus-visible{outline:2px solid var(--honey);outline-offset:1px}
 .btn[disabled]{opacity:.4;cursor:not-allowed;filter:none}
 .code{font-family:var(--f-num);font-size:44px;letter-spacing:.25em;text-align:center;color:var(--honey);user-select:all}
@@ -491,6 +493,7 @@ async function hostRoom(){
 async function joinRoom(){
   const code=($('#codeIn')?.value||'').trim().toUpperCase();
   if(!/^[A-Z0-9]{5}$/.test(code)){UI.err='请输入 5 位房间号';render();return;}
+  if(typeof Peer==='undefined'){UI.err='联机组件没有加载成功，请检查网络后刷新';render();return;}
   netReset();UI.err='';UI.kind='room';UI.code=code;UI.ov='joining';render();
   try{NET.peer=await openPeer();NET.peer.on('error',onPeerError);connectTo(PFX+code);}
   catch(e){fail(errText(e));}
@@ -656,7 +659,7 @@ function renderOverlay(V){
       <button class="btn full" id="modeAI" type="button">人机对战</button>
       <button class="btn ghost" id="modeQuick" type="button" ${netOK?'':'disabled'}>快速匹配</button>
       <button class="btn ghost" id="modeHost" type="button" ${netOK?'':'disabled'}>创建房间</button>
-      <div class="join"><input id="codeIn" maxlength="5" placeholder="房间号" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="房间号" ${netOK?'':'disabled'}><button class="btn ghost" id="modeJoin" type="button" ${netOK?'':'disabled'}>加入</button></div>
+      <div class="join"><input id="codeIn" maxlength="5" placeholder="输入房间号" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="房间号"><button class="btn ghost" id="modeJoin" type="button">加入</button></div>
     </div>
     ${UI.err?`<p class="err">${UI.err}</p>`:''}
     <p class="muted" style="margin:0;font-size:12.5px;text-align:center">${netOK?'创建房间后把房间号发给朋友；快速匹配会和正在等待的玩家配对。':'联机组件没有加载成功，请检查网络后刷新。人机对战可以正常玩。'}</p>`;
