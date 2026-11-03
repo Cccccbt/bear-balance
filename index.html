@@ -76,8 +76,8 @@ button.card:not([disabled]):hover,button.card:not([disabled]):focus-visible{tran
 button.card:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
 .hand.idle .card{filter:saturate(.55) brightness(.82)}
 .hand button.card.sel,.hand button.card.sel:hover{transform:translateY(-10px);box-shadow:0 0 0 2px var(--honey),0 10px 18px -8px var(--shade)}
-.hand button.card.sel::before{content:"出";position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:var(--honey);color:var(--honey-ink);font-family:var(--f-body);font-size:12px;display:grid;place-items:center;opacity:1;z-index:1}
-.hand.mull button.card.sel::before{content:"换";background:var(--swap);color:var(--swap-ink)}
+.hand button.card.sel::before{content:attr(data-badge);position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:var(--honey);color:var(--honey-ink);font-family:var(--f-body);font-size:12px;display:grid;place-items:center;opacity:1;z-index:1}
+.hand.mull button.card.sel::before{background:var(--swap);color:var(--swap-ink)}
 .phase{display:inline-flex;align-items:center;gap:8px;padding:5px 18px 5px 12px;border-radius:999px;border:1.5px solid currentColor;font-family:var(--f-display);font-size:20px;letter-spacing:.14em;line-height:1.2}
 .phase svg{width:20px;height:20px;flex:none}
 .phase small{font-family:var(--f-body);font-size:12px;letter-spacing:.04em;opacity:.85}
@@ -210,15 +210,16 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
 <div class="app" id="app">
   <header class="top">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <h1>熊之平衡</h1><span class="mode-tag" id="modeTag">人机</span>
-      <button class="btn ghost" id="menuBtn" type="button" style="font-size:13px;padding:3px 12px">大厅</button>
+      <h1 data-en="Bear Balance">熊之平衡</h1><span class="mode-tag" id="modeTag">人机</span>
+      <button class="btn ghost" id="menuBtn" type="button" style="font-size:13px;padding:3px 12px" data-en="Lobby">大厅</button>
+      <button class="btn ghost" id="langBtn" type="button" style="font-size:13px;padding:3px 12px" aria-label="Language / 语言">EN</button>
     </div>
     <ul class="rounds" id="rounds"></ul>
   </header>
 
-  <section class="side" id="oppSide" aria-label="对手">
+  <section class="side" id="oppSide" aria-label="对手" data-aria-en="Opponent">
     <div class="meta">
-      <span class="who">对手</span><span class="pips" id="oppPips"></span>
+      <span class="who" data-en="Opponent">对手</span><span class="pips" id="oppPips"></span>
       <span id="oppTags"></span><span class="spacer"></span>
       <span class="count" id="oppCount"></span>
     </div>
@@ -230,18 +231,18 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
     <div class="scale" aria-hidden="true">
       <div class="post"></div><div class="foot"></div>
       <div class="beam" id="beam"></div><div class="pivot"></div>
-      <div class="pan l" id="panL"><div class="str"></div><div class="bowl"><div class="num" id="totP">0</div><div class="lbl">你</div></div></div>
-      <div class="pan r" id="panR"><div class="str"></div><div class="bowl"><div class="num" id="totA">0</div><div class="lbl">对手</div></div></div>
+      <div class="pan l" id="panL"><div class="str"></div><div class="bowl"><div class="num" id="totP">0</div><div class="lbl" data-en="You">你</div></div></div>
+      <div class="pan r" id="panR"><div class="str"></div><div class="bowl"><div class="num" id="totA">0</div><div class="lbl" data-en="Opp.">对手</div></div></div>
     </div>
     <div class="phase" id="phase"></div>
     <div class="status" id="status" role="status" aria-live="polite"></div>
     <div class="actions" id="actions"></div>
   </section>
 
-  <section class="side" id="mySide" aria-label="你">
+  <section class="side" id="mySide" aria-label="你" data-aria-en="You">
     <div class="board" id="myBoard"></div>
     <div class="meta">
-      <span class="who">你</span><span class="pips" id="myPips"></span>
+      <span class="who" data-en="You">你</span><span class="pips" id="myPips"></span>
       <span id="myTags"></span><span class="spacer"></span>
       <span class="count" id="myCount"></span>
     </div>
@@ -251,19 +252,19 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
 
   <div class="info">
     <div class="panel">
-      <h2>对手的 16 张牌</h2>
+      <h2 data-en="Opponent’s 16 cards">对手的 16 张牌</h2>
       <div class="chips" id="oppTrack"></div>
-      <p>划掉的已经打出，其余在对手手牌或牌库里。</p>
+      <p data-en="Crossed out = already played. The rest are in the opponent’s hand or deck.">划掉的已经打出，其余在对手手牌或牌库里。</p>
     </div>
     <div class="panel">
-      <h2>你的牌库</h2>
+      <h2 data-en="Your deck">你的牌库</h2>
       <div class="chips" id="myDeck"></div>
-      <p>牌库里有哪些点数（顺序未知）。虚线是换牌阶段暂时放在一旁的牌。</p>
+      <p data-en="Values still in your deck (order unknown). Dashed = set aside while swapping.">牌库里有哪些点数（顺序未知）。虚线是换牌阶段暂时放在一旁的牌。</p>
     </div>
   </div>
 
   <details class="panel">
-    <summary>对局记录</summary>
+    <summary data-en="Game log">对局记录</summary>
     <ol class="log" id="log" reversed></ol>
   </details>
 </div>
@@ -277,6 +278,26 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
 const $=s=>document.querySelector(s);
 const sum=a=>a.reduce((x,y)=>x+y,0);
 const CN=['一','二','三'];
+/* 语言：中文 / English。记在本机，默认跟随浏览器语言 */
+let LANG=(()=>{try{const v=localStorage.getItem('bb-lang');if(v==='zh'||v==='en')return v;}catch(e){}return /^zh/i.test(navigator.language||'')?'zh':'en';})();
+const T=(zh,en)=>LANG==='en'?en:zh;
+const TT=x=>Array.isArray(x)?T(x[0],x[1]):(x||'');
+const RD=r=>T(`第${CN[r-1]}局`,`Round ${r}`);
+const rpsN=k=>TT(RPS[k]);
+function logText(l){
+  const t=TT(l.t),pre=TT(l.pre);
+  if(LANG==='en'){const w=l.who?(l.who==='p'?'You':'Opponent'):'';
+    return t.includes('{w}')?pre+t.replace('{w}',w):pre+(w?w+' ':'')+t;}
+  return pre+(l.who?(l.who==='p'?'你':'对手'):'')+t;
+}
+function applyLang(){
+  document.documentElement.lang=LANG==='en'?'en':'zh-CN';
+  document.title=T('熊之平衡','Bear Balance');
+  document.querySelectorAll('[data-en]').forEach(el=>{if(el.dataset.zh==null)el.dataset.zh=el.textContent;el.textContent=LANG==='en'?el.dataset.en:el.dataset.zh;});
+  document.querySelectorAll('[data-aria-en]').forEach(el=>{if(el.dataset.ariaZh==null)el.dataset.ariaZh=el.getAttribute('aria-label');el.setAttribute('aria-label',LANG==='en'?el.dataset.ariaEn:el.dataset.ariaZh);});
+  const b=document.getElementById('langBtn');if(b)b.textContent=LANG==='en'?'中文':'EN';
+}
+function setLang(l){LANG=l;try{localStorage.setItem('bb-lang',l);}catch(e){}applyLang();lastKey='';render();}
 const other=w=>w==='p'?'a':'p';
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 const PFX='bearbalance-v1-';
@@ -293,16 +314,16 @@ function newGame(mode){
   S={mode,round:1,phase:'mull',first:null,bonus:null,turn:null,wins:{p:0,a:0},pl:{p:newPlayer(),a:newPlayer()},results:[],log:[],busy:false,
      notes:{p:'',a:''},fresh:null,fn:0,mdone:{p:false,a:false},ready:{p:false,a:false},ended:null,rps:{p:null,a:null},rpsLast:null,gid:Math.random().toString(36).slice(2,8),rpsN:0};
   S.phase='rps';
-  L(null,mode==='ai'?'选择先手或后手，也可以猜拳决定。':'猜拳决定先后手，赢的一方先手。',true);
+  L(null,mode==='ai'?['选择先手或后手，也可以猜拳决定。','Choose to go first or second, or play rock-paper-scissors.']:['猜拳决定先后手，赢的一方先手。','Rock-paper-scissors decides who goes first.'],true);
 }
-const RPS={rock:'石头',scissors:'剪刀',paper:'布'},BEAT={rock:'scissors',scissors:'paper',paper:'rock'};
+const RPS={rock:['石头','Rock'],scissors:['剪刀','Scissors'],paper:['布','Paper']},BEAT={rock:'scissors',scissors:'paper',paper:'rock'};
 function pickRps(w,v){
   if(S.phase!=='rps'||S.rps[w]||!RPS[v])return;
   S.rps[w]=v;
   if(S.mode==='ai'&&!S.rps.a)S.rps.a=Object.keys(RPS)[Math.floor(Math.random()*3)];
   if(!(S.rps.p&&S.rps.a)){update();return;}
   const{p,a}=S.rps;S.rps={p:null,a:null};
-  if(p===a){S.rpsLast={p,a,res:'tie',n:S.gid+(++S.rpsN)};L(null,`猜拳：双方都出${RPS[p]}，平局重来`);update();return;}
+  if(p===a){S.rpsLast={p,a,res:'tie',n:S.gid+(++S.rpsN)};L(null,[`猜拳：双方都出${RPS[p][0]}，平局重来`,`RPS: both threw ${RPS[p][1]}, replay`]);update();return;}
   const win=BEAT[p]===a?'p':'a';
   S.rpsLast={p,a,res:win,n:S.gid+(++S.rpsN)};setFirst(win,'rps');
 }
@@ -311,8 +332,8 @@ function setFirst(win,how){
   S.first=win;S.bonus=win;
   for(const w of['p','a']){draw(w,10);sortHand(w);}
   S.pl[win].swaps=3;S.pl[other(win)].swaps=2;
-  if(how==='rps')L(win,'猜拳获胜，先手；第一局先手直接获得 3 点。',true);
-  else L(win,'先手，第一局先手直接获得 3 点。',true,'选定先后手：');
+  if(how==='rps')L(win,['猜拳获胜，先手；第一局先手直接获得 3 点。','won rock-paper-scissors — first player, +3 in round 1.'],true);
+  else L(win,['先手，第一局先手直接获得 3 点。','— first player, +3 in round 1.'],true,['选定先后手：','Sides chosen: ']);
   S.phase='mull';
   if(S.mode==='ai')aiMulligan();
   arm('mull',T_MULL+(how==='rps'?4200:1800)); // 留出猜拳和发牌动画的时间
@@ -324,8 +345,8 @@ const T_MULL=20000,T_PLAY=40000,T_NEXT=4800; // 结算动画约 1.8 秒，再停
 function arm(kind,ms){clearTimeout(TMR);S.dl=Date.now()+ms;S.dlKind=kind;const g=S;TMR=setTimeout(()=>{if(S===g)onTimeout(kind);},ms);}
 function disarm(){clearTimeout(TMR);TMR=null;if(S){S.dl=null;S.dlKind=null;}}
 function onTimeout(kind){
-  if(kind==='mull'&&S.phase==='mull'){for(const w of['p','a'])if(S.phase==='mull'&&!S.mdone[w]){L(w,'换牌超时，自动完成换牌');doneMull(w);}}
-  else if(kind==='play'&&S.phase==='play'&&!S.pl[S.turn].passed){L(S.turn,'出牌超时');doPass(S.turn);}
+  if(kind==='mull'&&S.phase==='mull'){for(const w of['p','a'])if(S.phase==='mull'&&!S.mdone[w]){L(w,['换牌超时，自动完成换牌','ran out of time — swapping finished']);doneMull(w);}}
+  else if(kind==='play'&&S.phase==='play'&&!S.pl[S.turn].passed){L(S.turn,['出牌超时','ran out of time']);doPass(S.turn);}
   else if(kind==='next'&&S.phase==='roundEnd')nextRound();
 }
 function L(who,t,r,pre){S.log.push({who,t,r:!!r,pre:pre||''});if(S.log.length>80)S.log.shift();}
@@ -358,7 +379,7 @@ function aiMulligan(){
     const avg=sum(p.deck)/p.deck.length;
     if(p.hand[0]<avg+off){swapCard('a',p.hand[0]);n++;}else break;
   }
-  if(n)L('a',`调度了 ${n} 次`);
+  if(n)L('a',[`调度了 ${n} 次`,`swapped ${n} card${n>1?'s':''}`]);
   endMull('a');S.mdone.a=true;
 }
 function aiDecide(){
@@ -403,7 +424,7 @@ function startPlay(){
   S.notes={p:'',a:''};
   if(isFinal()){autoR3();return;}
   S.phase='play';S.turn=S.first;
-  L(S.first,'先出牌',true,`第${CN[S.round-1]}局开始，`);
+  L(S.first,['先出牌','First to play: {w}.'],true,[`第${CN[S.round-1]}局开始，`,`Round ${S.round} begins. `]);
   schedule();
 }
 function schedule(){
@@ -422,16 +443,16 @@ function advance(){
 }
 function doPlay(w,card){
   const p=S.pl[w];p.hand.splice(p.hand.indexOf(card),1);p.board.push(card);p.played.push(card);
-  S.fresh={w,card,n:++S.fn};L(w,`打出 ${card}`);advance();
+  S.fresh={w,card,n:++S.fn};L(w,[`打出 ${card}`,`played ${card}`]);advance();
 }
-function doPass(w,auto){S.pl[w].passed=true;L(w,auto?'没有手牌，自动放弃':'放弃跟牌');advance();}
+function doPass(w,auto){S.pl[w].passed=true;L(w,auto?['没有手牌，自动放弃','had no cards — auto pass']:['放弃跟牌','passed']);advance();}
 function endRound(){
   disarm();
   const tp=total('p'),ta=total('a');
   const res=tp>ta?'p':ta>tp?'a':'tie';
   if(res==='tie'){S.wins.p++;S.wins.a++;}else S.wins[res]++;
   S.results.push({p:tp,a:ta,res,cp:[...S.pl.p.board],ca:[...S.pl.a.board],bonus:S.round===1?S.bonus:null});
-  L(res==='tie'?null:res,res==='tie'?'平局，双方各得一胜':'赢',true,`第${CN[S.round-1]}局结束，`);
+  L(res==='tie'?null:res,res==='tie'?['平局，双方各得一胜','tie — both score a win']:['赢','won'],true,[`第${CN[S.round-1]}局结束，`,`Round ${S.round} over: `]);
   if(res!=='tie')S.first=res;
   const over=S.wins.p>=2||S.wins.a>=2||S.round===3;
   S.phase=over?'over':'roundEnd';
@@ -452,8 +473,8 @@ function nextRound(){
     const p=S.pl[w];p.board=[];p.passed=false;
     const room=Math.max(0,10-p.hand.length),d=Math.min(3,room),got=draw(w,d);
     p.swaps=2+(3-d);sortHand(w);
-    const m=`抽 ${got} 张，可换 ${p.swaps} 次`;
-    S.notes[w]=`本局你${m}。`+(isFinal()?'这是决胜局，换完牌后双方手牌会全部自动打出。':'');L(w,m);
+    const m=[`抽 ${got} 张，可换 ${p.swaps} 次`,`drew ${got}, ${p.swaps} swaps`];
+    S.notes[w]=[`本局你${m[0]}。`+(isFinal()?'这是决胜局，换完牌后双方手牌会全部自动打出。':''),`You drew ${got} and have ${p.swaps} swaps.`+(isFinal()?' Deciding round: after swapping, all cards are played automatically.':'')];L(w,m);
     S.mdone[w]=!(p.swaps>0&&p.deck.length);
     if(S.mdone[w])endMull(w);
   }
@@ -464,10 +485,10 @@ function nextRound(){
 function autoR3(){
   S.phase='auto';
   for(const w of['p','a']){const p=S.pl[w];p.board=[...p.hand];p.played.push(...p.hand);p.hand=[];p.passed=true;}
-  L(null,'双方手牌全部自动打出',true,`第${CN[S.round-1]}局是决胜局：`);
+  L(null,['双方手牌全部自动打出','all cards played automatically'],true,[`第${CN[S.round-1]}局是决胜局：`,`Round ${S.round} is the decider: `]);
   update();const g=S;setTimeout(()=>{if(S===g)endRound();},1400);
 }
-function resign(w){if(S.phase==='over')return;disarm();S.phase='over';S.ended=w;S.ready={p:false,a:false};L(w,'认输',true);update();}
+function resign(w){if(S.phase==='over')return;disarm();S.phase='over';S.ended=w;S.ready={p:false,a:false};L(w,['认输','resigned'],true);update();}
 
 /* Apply an action from seat w. */
 function apply(w,type,c){
@@ -477,11 +498,11 @@ function apply(w,type,c){
     const nc=swapCard(w,c);if(nc==null)return;
     const p=S.pl[w];
     if(p.swaps<=0||!p.deck.length){
-      L(w,'换牌次数用完，自动完成换牌');doneMull(w);
-      if(S.phase==='mull')S.notes[w]=`你换掉 ${c}，抽到 ${nc}。换牌次数已用完，自动完成换牌。`;
+      L(w,['换牌次数用完，自动完成换牌','used all swaps — swapping done']);doneMull(w);
+      if(S.phase==='mull')S.notes[w]=[`你换掉 ${c}，抽到 ${nc}。换牌次数已用完，自动完成换牌。`,`You swapped ${c} for ${nc}. No swaps left — swapping done.`];
       update();return;
     }
-    S.notes[w]=`你换掉 ${c}，抽到 ${nc}`;update();
+    S.notes[w]=[`你换掉 ${c}，抽到 ${nc}`,`You swapped ${c} for ${nc}.`];update();
   }else if(type==='done')doneMull(w);
   else if(type==='play'){
     if(S.phase==='play'&&S.turn===w&&!S.pl[w].passed&&!S.busy&&S.pl[w].hand.includes(c))doPlay(w,c);
@@ -503,7 +524,7 @@ function viewFor(me){
   return{mode:S.mode,round:S.round,phase,first:F(S.first),bonus:F(S.bonus),turn:F(S.turn),
     wins:{p:S.wins[me],a:S.wins[op]},tot:{p:total(me),a:total(op)},
     results:S.results.map(r=>({p:r[me],a:r[op],res:r.res==='tie'?'tie':F(r.res),cp:me==='p'?r.cp:r.ca,ca:me==='p'?r.ca:r.cp,bonus:r.bonus?F(r.bonus):null})),
-    log:S.log.map(l=>({t:l.pre+(l.who?(l.who===me?'你':'对手'):'')+l.t,r:l.r})),
+    log:S.log.map(l=>({who:l.who?(l.who===me?'p':'a'):null,t:l.t,pre:l.pre,r:l.r})),
     busy:S.busy&&S.turn===op,note:S.notes[me],fresh:S.fresh&&{w:F(S.fresh.w),card:S.fresh.card,n:S.fresh.n},
     gid:S.gid,ready:{p:S.ready[me],a:S.ready[op]},left:S.dl?Math.max(0,S.dl-Date.now()):null,ended:S.ended?F(S.ended):null,
     rpsMine:S.rps?S.rps[me]:null,rpsLast:rl&&{p:rl[me],a:rl[op],res:rl.res==='tie'?'tie':F(rl.res),n:rl.n},
@@ -540,8 +561,9 @@ function openPeer(id){
 }
 function errText(e){
   const t=e&&e.type;
-  return{'peer-unavailable':'没有找到这个房间号，或房主已离开','network':'网络连接失败，请检查网络后重试','server-error':'联机服务暂时不可用，请稍后再试',
-    'browser-incompatible':'这个浏览器不支持联机，请换用 Chrome、Edge 或 Safari','socket-error':'联机服务连接中断'}[t]||('联机出错：'+(t||e&&e.message||'未知错误'));
+  const m={'peer-unavailable':['没有找到这个房间号，或房主已离开','Room not found, or the host has left'],'network':['网络连接失败，请检查网络后重试','Network error — check your connection and try again'],'server-error':['联机服务暂时不可用，请稍后再试','The online service is unavailable — try again later'],
+    'browser-incompatible':['这个浏览器不支持联机，请换用 Chrome、Edge 或 Safari','This browser can’t play online — try Chrome, Edge or Safari'],'socket-error':['联机服务连接中断','Lost connection to the online service']}[t];
+  return m?TT(m):T('联机出错：','Connection error: ')+(t||e&&e.message||T('未知错误','unknown'));
 }
 function fail(msg){UI.canResume=false;netReset();UI.role='ai';UI.err=msg;UI.ov='home';newGame('ai');render();}
 function onPeerError(e){
@@ -569,12 +591,12 @@ function connectTo(id){
   const c=NET.peer.connect(id,{reliable:true});
   NET.conn=c;
   clearTimeout(NET.timer);
-  NET.timer=setTimeout(()=>{if(!c.open)fail('连接超时：房间可能已关闭，或网络不支持直连');},12000);
+  NET.timer=setTimeout(()=>{if(!c.open)fail(T('连接超时：房间可能已关闭，或网络不支持直连','Connection timed out: the room may be closed, or your network blocks direct connections'));},12000);
   c.on('open',()=>{clearTimeout(NET.timer);UI.role='guest';UI.view=null;UI.dismissed='';UI.animN=-1;c.send({type:'hello'});render();});
   c.on('data',m=>{
     if(!m)return;
     if(m.type==='view'){UI.view=m.v;UI.view.recv=Date.now();if(UI.ov==='joining'||UI.ov==='searching')UI.ov=null;render();}
-    else if(m.type==='full')fail('这个房间已经满了');
+    else if(m.type==='full')fail(T('这个房间已经满了','This room is full'));
   });
   c.on('close',()=>onConnClose(c));
   c.on('error',()=>{});
@@ -593,9 +615,9 @@ async function hostRoom(){
 }
 async function joinRoom(){
   const code=($('#codeIn')?.value||'').trim().toUpperCase();
-  if(!/^[A-Z0-9]{5}$/.test(code)){UI.err='请输入 5 位房间号';render();return;}
-  if(window.claude){UI.err='这里不能联机，请到网页版 cccccbt.github.io/bear-balance 加入';render();return;}
-  if(typeof Peer==='undefined'){UI.err='联机组件没有加载成功，请检查网络后刷新';render();return;}
+  if(!/^[A-Z0-9]{5}$/.test(code)){UI.err=T('请输入 5 位房间号','Enter the 5-character room code');render();return;}
+  if(window.claude){UI.err=T('这里不能联机，请到网页版 cccccbt.github.io/bear-balance 加入','Online play isn’t available here — open cccccbt.github.io/bear-balance');render();return;}
+  if(typeof Peer==='undefined'){UI.err=T('联机组件没有加载成功，请检查网络后刷新','Online play failed to load — check your network and refresh');render();return;}
   netReset();UI.err='';UI.kind='room';UI.code=code;UI.ov='joining';render();
   try{NET.peer=await openPeer();NET.peer.on('error',onPeerError);connectTo(PFX+code);}
   catch(e){fail(errText(e));}
@@ -621,7 +643,7 @@ async function quickMatch(retry){
 async function quickJoin(){
   NET.peer=await openPeer();NET.peer.on('error',onPeerError);
   const lc=NET.peer.connect(PFX+'lobby',{reliable:true});
-  NET.timer=setTimeout(()=>{if(UI.tries<3){UI.tries++;quickMatch(true);}else fail('暂时没有找到对手，请稍后再试');},10000);
+  NET.timer=setTimeout(()=>{if(UI.tries<3){UI.tries++;quickMatch(true);}else fail(T('暂时没有找到对手，请稍后再试','No opponent found — try again later'));},10000);
   lc.on('open',()=>{try{lc.send({type:'hi'});}catch(e){}});
   lc.on('data',m=>{
     if(m&&m.type==='redirect'){clearTimeout(NET.timer);UI.code=m.code;try{lc.close();}catch(e){}connectTo(PFX+m.code);}
@@ -636,26 +658,26 @@ function currentView(){
 }
 function cardHTML(c,o={}){
   const st=`--v:${((c-1)/15).toFixed(3)}`+(o.delay!=null?`;animation-delay:${o.delay}ms`:'');
-  if(o.btn)return`<button type="button" class="card${o.sel?' sel':''}" style="${st}" data-c="${c}" ${o.disabled?'disabled':''} aria-label="${o.label||''}${c} 点"><span class="ix">${c}</span><span class="big">${c}</span></button>`;
+  if(o.btn)return`<button type="button" class="card${o.sel?' sel':''}" style="${st}" data-c="${c}" data-badge="${o.badge||''}" ${o.disabled?'disabled':''} aria-label="${o.label||''}${c}${T(' 点','')}"><span class="ix">${c}</span><span class="big">${c}</span></button>`;
   return`<div class="card ${o.cls||''}" style="${st}"><span class="ix">${c}</span><span class="big">${c}</span></div>`;
 }
 function boardHTML(V,w,animate){
   const p=V.pl[w];let h='';
-  if(V.round===1&&V.bonus===w)h+=`<div class="bonus">+3<small>先手</small></div>`;
+  if(V.round===1&&V.bonus===w)h+=`<div class="bonus">+3<small>${T('先手','1st')}</small></div>`;
   h+=p.board.map((c,i)=>{
     return cardHTML(c,{});
   }).join('');
-  return h||`<span class="empty">还没有出牌</span>`;
+  return h||`<span class="empty">${T('还没有出牌','No cards played')}</span>`;
 }
 function pips(n){return[0,1].map(i=>`<i class="${i<n?'on':''}"></i>`).join('');}
 function tags(V,w){
   const p=V.pl[w],t=[];
   if(V.phase==='play'||V.phase==='auto'){
-    if(V.first===w&&V.round<3)t.push('<span class="tag hot">本局先手</span>');
-    if(p.passed&&V.round<3)t.push('<span class="tag off">已放弃</span>');
-    else if(V.phase==='play'&&V.turn===w)t.push(`<span class="tag hot">${w==='a'?(V.mode==='ai'?'思考中…':'出牌中…'):'该你出牌'}</span>`);
+    if(V.first===w&&V.round<3)t.push(`<span class="tag hot">${T('本局先手','Leads')}</span>`);
+    if(p.passed&&V.round<3)t.push(`<span class="tag off">${T('已放弃','Passed')}</span>`);
+    else if(V.phase==='play'&&V.turn===w)t.push(`<span class="tag hot">${w==='a'?(V.mode==='ai'?T('思考中…','Thinking…'):T('出牌中…','Playing…')):T('该你出牌','Your turn')}</span>`);
   }
-  if((V.phase==='mull'||V.phase==='waitMull')&&V.round===1)t.push(`<span class="tag">${V.first===w?'先手':'后手'}</span>`);
+  if((V.phase==='mull'||V.phase==='waitMull')&&V.round===1)t.push(`<span class="tag">${V.first===w?T('先手','First'):T('后手','Second')}</span>`);
   return t.join(' ');
 }
 function blankView(){return{mode:'ai',round:1,phase:'wait',first:'p',bonus:null,turn:null,wins:{p:0,a:0},tot:{p:0,a:0},results:[],log:[],busy:false,note:'',fresh:null,ready:{p:false,a:false},ended:null,
@@ -665,18 +687,18 @@ function render(){
   const P=V.pl.p,A=V.pl.a;
   const online=UI.role!=='ai';
   const snap=fxSnapshot();
-  $('#modeTag').textContent=online?(UI.kind==='quick'?'快速匹配':`联机 · 房间 ${UI.code}`):'人机';
+  $('#modeTag').textContent=online?(UI.kind==='quick'?T('快速匹配','Quick match'):T(`联机 · 房间 ${UI.code}`,`Online · Room ${UI.code}`)):T('人机','vs AI');
   $('#rounds').innerHTML=[1,2,3].map(r=>{
     const res=V.results[r-1];let cls='',txt='—';
     if(res){cls={p:'win',a:'lose',tie:'tie'}[res.res];txt=`${res.p}:${res.a}`;}
-    else if(r===V.round&&V.phase!=='over'&&V.phase!=='wait'){cls='cur';txt=(V.phase==='rps'||V.phase==='waitRps')?'猜拳':(V.phase==='mull'||V.phase==='waitMull')?'换牌':'进行中';}
-    return`<li class="${cls}"><b>第${CN[r-1]}局</b><span>${txt}</span></li>`;
+    else if(r===V.round&&V.phase!=='over'&&V.phase!=='wait'){cls='cur';txt=(V.phase==='rps'||V.phase==='waitRps')?T('猜拳','Sides'):(V.phase==='mull'||V.phase==='waitMull')?T('换牌','Swap'):T('进行中','Playing');}
+    return`<li class="${cls}"><b>${RD(r)}</b><span>${txt}</span></li>`;
   }).join('');
   $('#oppPips').innerHTML=pips(V.wins.a);$('#myPips').innerHTML=pips(V.wins.p);
-  $('#oppTags').innerHTML=tags(V,'a')+(online&&V.phase==='waitMull'?' <span class="tag">换牌中</span>':'');
+  $('#oppTags').innerHTML=tags(V,'a')+(online&&V.phase==='waitMull'?` <span class="tag">${T('换牌中','Swapping')}</span>`:'');
   $('#myTags').innerHTML=tags(V,'p');
-  $('#oppCount').textContent=`手牌 ${A.handCount} · 牌库 ${A.deckCount}`;
-  $('#myCount').textContent=`手牌 ${P.hand.length}/10 · 牌库 ${P.deck.length+P.aside.length}`;
+  $('#oppCount').textContent=T(`手牌 ${A.handCount} · 牌库 ${A.deckCount}`,`Hand ${A.handCount} · Deck ${A.deckCount}`);
+  $('#myCount').textContent=T(`手牌 ${P.hand.length}/10 · 牌库 ${P.deck.length+P.aside.length}`,`Hand ${P.hand.length}/10 · Deck ${P.deck.length+P.aside.length}`);
   $('#oppBacks').innerHTML='<span class="back"></span>'.repeat(A.handCount);
   const animate=V.fresh&&V.fresh.n!==UI.animN;
   $('#oppBoard').innerHTML=boardHTML(V,'a',animate);$('#myBoard').innerHTML=boardHTML(V,'p',animate);
@@ -687,11 +709,11 @@ function render(){
   const app=$('#app');app.classList.toggle('ph-mull',PH==='mull');app.classList.toggle('ph-play',PH==='play');
   const ICO_SWAP='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13l-4-4M20 16H7l4 4"/></svg>';
   const ICO_PLAY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 8v8M8 12l4 4 4-4" stroke-linecap="round"/></svg>';
-  const rn=`第${CN[V.round-1]}局`;
-  const phHTML={mull:`${ICO_SWAP}${rn} · 换牌阶段${V.phase==='waitMull'?'<small>等待对手</small>':''}`,
-    play:`${ICO_PLAY}${rn} · 出牌阶段<small>${V.turn==='p'&&!P.passed?'轮到你':V.turn==='a'&&!A.passed?'对手出牌中':''}</small>`,
-    auto:`${ICO_PLAY}${rn} · 决胜局自动出牌`,
-    idle:V.phase==='rps'||V.phase==='waitRps'?'决定先后手':''}[PH];
+  const rn=RD(V.round);
+  const phHTML={mull:`${ICO_SWAP}${rn} · ${T('换牌阶段','Swap phase')}${V.phase==='waitMull'?`<small>${T('等待对手','waiting for opponent')}</small>`:''}`,
+    play:`${ICO_PLAY}${rn} · ${T('出牌阶段','Play phase')}<small>${V.turn==='p'&&!P.passed?T('轮到你','your turn'):V.turn==='a'&&!A.passed?T('对手出牌中','opponent’s turn'):''}</small>`,
+    auto:`${ICO_PLAY}${rn} · ${T('决胜局自动出牌','Decider · auto-play')}`,
+    idle:V.phase==='rps'||V.phase==='waitRps'?T('决定先后手','Choose who goes first'):''}[PH];
   const phEl=$('#phase');
   if(phEl.innerHTML!==phHTML){phEl.innerHTML=phHTML;phEl.className='phase '+PH;
     const pk=PH+V.round;if(UI.phKey!==pk){UI.phKey=pk;if(!reduced()&&PH!=='idle')phEl.animate([{transform:'scale(1.35)',opacity:0},{transform:'scale(.95)',opacity:1,offset:.6},{transform:'none'}],{duration:480,easing:'cubic-bezier(.2,1.2,.4,1)'});}}
@@ -702,10 +724,10 @@ function render(){
   if(UI.selKey!==selKey||!(canSwap||canPlay)||!P.hand.includes(UI.sel)){UI.sel=null;UI.selKey=selKey;}
   const hand=$('#hand');
   hand.className='hand'+(V.phase==='mull'?' mull':'')+(!canSwap&&!canPlay?' idle':'');
-  hand.innerHTML=P.hand.map(c=>cardHTML(c,{btn:true,sel:c===UI.sel,disabled:!(canSwap||canPlay),label:V.phase==='mull'?'换掉 ':'打出 '})).join('')||'<span class="muted">没有手牌</span>';
+  hand.innerHTML=P.hand.map(c=>cardHTML(c,{btn:true,sel:c===UI.sel,disabled:!(canSwap||canPlay),label:V.phase==='mull'?T('换掉 ','Swap '):T('打出 ','Play '),badge:V.phase==='mull'?T('换','⇄'):T('出','↑')})).join('')||`<span class="muted">${T('没有手牌','No cards')}</span>`;
   const aside=$('#aside');
   aside.hidden=!(V.phase==='mull'&&P.aside.length);
-  aside.innerHTML='已换下（换牌结束后洗回牌库）：'+P.aside.map(c=>`<span class="chip set">${c}</span>`).join('');
+  aside.innerHTML=T('已换下（换牌结束后洗回牌库）：','Set aside (shuffled back after swapping): ')+P.aside.map(c=>`<span class="chip set">${c}</span>`).join('');
 
   const tp=V.tot.p,ta=V.tot.a;
   $('#totP').textContent=tp;$('#totA').textContent=ta;
@@ -716,31 +738,31 @@ function render(){
   let st='',acts='';
   const rl=V.rpsLast,RN=RPS;
   if(V.phase==='rps'&&V.mode==='ai'){
-    st='选择先后手：先手第一局 +3 点、可换牌 3 次；后手可换牌 2 次。也可以猜拳决定。';
-    if(rl&&rl.res==='tie')st+=`<span class="note">刚才双方都出了${RN[rl.p]}，再来一次。</span>`;
-    acts=`<button class="btn" data-first="me" type="button">我先手</button><button class="btn" data-first="opp" type="button">我后手</button>`
-      +`<span class="or">或猜拳</span>`+Object.keys(RN).map(k=>`<button class="btn ghost rps" data-rps="${k}" type="button">${RN[k]}</button>`).join('');
+    st=T('选择先后手：先手第一局 +3 点、可换牌 3 次；后手可换牌 2 次。也可以猜拳决定。','Choose sides: the first player gets +3 in round 1 and 3 swaps; the second player gets 2 swaps. Or play rock-paper-scissors.');
+    if(rl&&rl.res==='tie')st+=`<span class="note">${T(`刚才双方都出了${rpsN(rl.p)}，再来一次。`,`You both threw ${rpsN(rl.p)} — go again.`)}</span>`;
+    acts=`<button class="btn" data-first="me" type="button">${T('我先手','Go first')}</button><button class="btn" data-first="opp" type="button">${T('我后手','Go second')}</button>`
+      +`<span class="or">${T('或猜拳','or RPS')}</span>`+Object.keys(RN).map(k=>`<button class="btn ghost rps" data-rps="${k}" type="button">${rpsN(k)}</button>`).join('');
   }else if(V.phase==='rps'){
-    st='猜拳决定先后手：赢的一方先手（第一局 +3 点，可换牌 3 次）。';
-    if(rl&&rl.res==='tie')st+=`<span class="note">刚才双方都出了${RN[rl.p]}，再来一次。</span>`;
-    acts=Object.keys(RN).map(k=>`<button class="btn ghost rps" data-rps="${k}" type="button">${RN[k]}</button>`).join('');
+    st=T('猜拳决定先后手：赢的一方先手（第一局 +3 点，可换牌 3 次）。','Rock-paper-scissors: the winner goes first (+3 in round 1, 3 swaps).');
+    if(rl&&rl.res==='tie')st+=`<span class="note">${T(`刚才双方都出了${rpsN(rl.p)}，再来一次。`,`You both threw ${rpsN(rl.p)} — go again.`)}</span>`;
+    acts=Object.keys(RN).map(k=>`<button class="btn ghost rps" data-rps="${k}" type="button">${rpsN(k)}</button>`).join('');
   }else if(V.phase==='waitRps'){
-    st=`<span class="spin"></span>你出了${RN[V.rpsMine]}，等待对手出拳…`;
+    st=`<span class="spin"></span>${T(`你出了${rpsN(V.rpsMine)}，等待对手出拳…`,`You threw ${rpsN(V.rpsMine)}. Waiting for your opponent…`)}`;
   }else if(V.phase==='mull'){
-    st=P.deck.length?`<span class="swapleft">剩余换牌 <b>${P.swaps}</b> 次</span>双击想换掉的牌。换下的牌在换牌结束前不会再抽到，次数用完自动完成换牌。`:'牌库已空，无法换牌。';
-    acts=`<button class="btn" id="doneMull" type="button">完成换牌</button>`;
-  }else if(V.phase==='waitMull')st='<span class="spin"></span>等待对手完成换牌…';
+    st=P.deck.length?`<span class="swapleft">${T(`剩余换牌 <b>${P.swaps}</b> 次`,`Swaps left: <b>${P.swaps}</b>`)}</span>${T('双击想换掉的牌。换下的牌在换牌结束前不会再抽到，次数用完自动完成换牌。','Double-tap a card to swap it. Swapped-out cards won’t come back until swapping ends; it finishes automatically when you run out.')}`:T('牌库已空，无法换牌。','Your deck is empty — no swaps possible.');
+    acts=`<button class="btn" id="doneMull" type="button">${T('完成换牌','Done swapping')}</button>`;
+  }else if(V.phase==='waitMull')st=`<span class="spin"></span>${T('等待对手完成换牌…','Waiting for your opponent to finish swapping…')}`;
   else if(V.phase==='play'){
-    if(V.turn==='p')st=A.passed?'对手已放弃。你可以继续出牌，或放弃结束本局。':'轮到你：点一张牌打出，或放弃跟牌。';
-    else st=P.passed?'你已放弃，对手还可以继续出牌…':(V.mode==='ai'?'对手思考中…':'<span class="spin"></span>等待对手出牌…');
-    if(canPlay)acts=`<button class="btn ghost" id="passBtn" type="button">放弃跟牌</button>`;
-  }else if(V.phase==='auto')st=`第${CN[V.round-1]}局是决胜局：双方所有手牌一次性自动打出。`;
-  else if(V.phase==='roundEnd'||V.phase==='over')st='本局结束。';
-  if(online&&!['over','wait','rps','waitRps'].includes(V.phase))acts+=`<button class="btn ghost" id="resign" type="button">${UI.confirmResign?'确认认输':'认输'}</button>`;
-  if(V.phase==='over'&&!overlayFor(V))acts=`<button class="btn" id="readyBtn" type="button" ${V.ready.p?'disabled':''}>${V.ready.p?'等待对手…':'再来一局'}</button>`;
-  if(UI.sel!=null)st=`已选 <b>${UI.sel}</b>，再点一次这张牌确认${V.phase==='mull'?'换掉':'打出'}。`;
-  if(rl&&rl.res!=='tie'&&V.round===1&&(V.phase==='mull'||V.phase==='waitMull'))st+=`<span class="note">猜拳：你出${RN[rl.p]}，对手出${RN[rl.a]}，${rl.res==='p'?'你先手':'对手先手'}。</span>`;
-  if(V.note)st+=`<span class="note">${V.note}</span>`;
+    if(V.turn==='p')st=A.passed?T('对手已放弃。你可以继续出牌，或放弃结束本局。','Your opponent passed. Keep playing, or pass to end the round.'):T('轮到你：点一张牌打出，或放弃跟牌。','Your turn: double-tap a card to play it, or pass.');
+    else st=P.passed?T('你已放弃，对手还可以继续出牌…','You passed; your opponent can keep playing…'):(V.mode==='ai'?T('对手思考中…','Opponent is thinking…'):`<span class="spin"></span>${T('等待对手出牌…','Waiting for your opponent…')}`);
+    if(canPlay)acts=`<button class="btn ghost" id="passBtn" type="button">${T('放弃跟牌','Pass')}</button>`;
+  }else if(V.phase==='auto')st=T(`第${CN[V.round-1]}局是决胜局：双方所有手牌一次性自动打出。`,`Round ${V.round} is the decider: every card in both hands is played automatically.`);
+  else if(V.phase==='roundEnd'||V.phase==='over')st=T('本局结束。','Round over.');
+  if(online&&!['over','wait','rps','waitRps'].includes(V.phase))acts+=`<button class="btn ghost" id="resign" type="button">${UI.confirmResign?T('确认认输','Confirm resign'):T('认输','Resign')}</button>`;
+  if(V.phase==='over'&&!overlayFor(V))acts=`<button class="btn" id="readyBtn" type="button" ${V.ready.p?'disabled':''}>${V.ready.p?T('等待对手…','Waiting…'):T('再来一局','Play again')}</button>`;
+  if(UI.sel!=null)st=T(`已选 <b>${UI.sel}</b>，再点一次这张牌确认${V.phase==='mull'?'换掉':'打出'}。`,`Selected <b>${UI.sel}</b> — tap it again to ${V.phase==='mull'?'swap':'play'} it.`);
+  if(rl&&rl.res!=='tie'&&V.round===1&&(V.phase==='mull'||V.phase==='waitMull'))st+=`<span class="note">${T(`猜拳：你出${rpsN(rl.p)}，对手出${rpsN(rl.a)}，${rl.res==='p'?'你先手':'对手先手'}。`,`RPS: you ${rpsN(rl.p)}, opponent ${rpsN(rl.a)} — ${rl.res==='p'?'you go first':'opponent goes first'}.`)}</span>`;
+  if(V.note)st+=`<span class="note">${TT(V.note)}</span>`;
   UI.dl=V.left!=null&&(V.phase==='mull'||V.phase==='waitMull'||V.phase==='play'||V.phase==='roundEnd')?(V.recv||Date.now())+V.left:null;
   UI.dlMax=V.phase==='play'?40:20;
   UI.dlMine=V.phase==='mull'||(V.phase==='play'&&V.turn==='p'&&!P.passed);
@@ -749,8 +771,8 @@ function render(){
 
   $('#oppTrack').innerHTML=Array.from({length:16},(_,i)=>i+1).map(c=>`<span class="chip ${A.played.includes(c)?'out':''}">${c}</span>`).join('');
   const deckView=[...P.deck].sort((a,b)=>a-b).map(c=>`<span class="chip">${c}</span>`).join('')+[...P.aside].sort((a,b)=>a-b).map(c=>`<span class="chip set">${c}</span>`).join('');
-  $('#myDeck').innerHTML=deckView||'<span class="muted">空</span>';
-  $('#log').innerHTML=V.log.slice().reverse().map(l=>`<li class="${l.r?'r':''}">${l.t}</li>`).join('');
+  $('#myDeck').innerHTML=deckView||`<span class="muted">${T('空','Empty')}</span>`;
+  $('#log').innerHTML=V.log.slice().reverse().map(l=>`<li class="${l.r?'r':''}">${l.t!==undefined&&l.pre===undefined?l.t:logText(l)}</li>`).join('');
   fxAfter(snap,V);
   renderOverlay(V);
   if(V.rpsLast&&V.rpsLast.n!==UI.rpsSeen){UI.rpsSeen=V.rpsLast.n;showRps(V.rpsLast);}
@@ -758,10 +780,10 @@ function render(){
 
 function tickClock(){
   const an=$('#autoNext');
-  if(an&&UI.dl)an.textContent=Math.min(3,Math.max(0,Math.ceil((UI.dl-Date.now())/1000)))+' 秒后自动开始';
+  if(an&&UI.dl)an.textContent=Math.min(3,Math.max(0,Math.ceil((UI.dl-Date.now())/1000)))+T(' 秒后自动开始','s until next round');
   const el=$('#clock');if(!el||!UI.dl)return;
   const s=Math.min(UI.dlMax||99,Math.max(0,Math.ceil((UI.dl-Date.now())/1000)));
-  el.textContent=(UI.dlMine?(currentView()?.phase==='play'?'出牌剩余 ':'换牌剩余 '):'对手剩余 ')+s+' 秒';
+  el.textContent=(UI.dlMine?(currentView()?.phase==='play'?T('出牌剩余 ','Time to play: '):T('换牌剩余 ','Time to swap: ')):T('对手剩余 ','Opponent’s time: '))+s+T(' 秒','s');
   el.classList.toggle('urgent',UI.dlMine&&s<=5);
 }
 setInterval(tickClock,250);
@@ -842,21 +864,21 @@ const ICON={
 let rpsTimers=[];
 function showRps(rl){
   const fx=$('#fx');rpsTimers.forEach(clearTimeout);rpsTimers=[];
-  const res=rl.res==='tie'?'平局，再来一次':rl.res==='p'?'你赢了！你先手':'对手赢了，对手先手';
+  const res=rl.res==='tie'?T('平局，再来一次','Tie — go again'):rl.res==='p'?T('你赢了！你先手','You win! You go first'):T('对手赢了，对手先手','Opponent wins and goes first');
   const cls=rl.res==='tie'?'tie':rl.res==='p'?'win':'lose';
-  fx.innerHTML=`<div class="fx-box" role="dialog" aria-label="猜拳结果">
+  fx.innerHTML=`<div class="fx-box" role="dialog" aria-label="${T('猜拳结果','Rock-paper-scissors result')}">
     <div class="rps-row">
-      <div class="rps-side"><div class="hand-ico shake" id="rpsP">${ICON.rock}</div><span class="lbl">你</span></div>
+      <div class="rps-side"><div class="hand-ico shake" id="rpsP">${ICON.rock}</div><span class="lbl">${T('你','You')}</span></div>
       <span class="rps-vs">VS</span>
-      <div class="rps-side"><div class="hand-ico shake opp" id="rpsA">${ICON.rock}</div><span class="lbl">对手</span></div>
+      <div class="rps-side"><div class="hand-ico shake opp" id="rpsA">${ICON.rock}</div><span class="lbl">${T('对手','Opponent')}</span></div>
     </div>
-    <div class="rps-res" id="rpsRes">石头、剪刀、布……</div></div>`;
+    <div class="rps-res" id="rpsRes">${T('石头、剪刀、布……','Rock, paper, scissors…')}</div></div>`;
   fx.hidden=false;
   const reveal=()=>{
     const p=$('#rpsP'),a=$('#rpsA'),r=$('#rpsRes');if(!p)return;
     p.className='hand-ico reveal'+(rl.res==='p'?' won':'');p.innerHTML=ICON[rl.p];
     a.className='hand-ico reveal opp'+(rl.res==='a'?' won':'');a.innerHTML=ICON[rl.a];
-    r.className='rps-res '+cls;r.textContent=`${RPS[rl.p]} 对 ${RPS[rl.a]} · ${res}`;
+    r.className='rps-res '+cls;r.textContent=`${rpsN(rl.p)} ${T('对','vs')} ${rpsN(rl.a)} · ${res}`;
   };
   if(reduced())reveal();else rpsTimers.push(setTimeout(reveal,960));
   rpsTimers.push(setTimeout(()=>{fx.hidden=true;},reduced()?1600:2700));
@@ -878,24 +900,30 @@ function settleHTML(r){
     let i=0,chips='';
     if(r.bonus===w)chips+=`<span class="schip bonus-chip" style="animation-delay:${Math.round(base+(i++)*step)}ms">+3</span>`;
     chips+=cards.map(c=>`<span class="schip" style="--v:${((c-1)/15).toFixed(3)};animation-delay:${Math.round(base+(i++)*step)}ms">${c}</span>`).join('');
-    return`<div class="srow${won?' won':''}" style="--d:${dur+120}ms"><span class="who2">${label}</span><div class="schips">${chips||'<span class="muted">没有出牌</span>'}</div><span class="stot" data-count="${total}" data-dur="${dur}">0</span></div>`;
+    return`<div class="srow${won?' won':''}" style="--d:${dur+120}ms"><span class="who2">${label}</span><div class="schips">${chips||`<span class="muted">${T('没有出牌','No cards')}</span>`}</div><span class="stot" data-count="${total}" data-dur="${dur}">0</span></div>`;
   };
   const vcls={p:'win',a:'lose',tie:'tie'}[r.res];
-  const vtxt={p:'你赢下这一局',a:'对手赢下这一局',tie:'平局 · 双方各得一胜'}[r.res];
-  return{dur,html:`<div class="settle">${row('p','你',r.cp,r.p,winP)}${row('a','对手',r.ca,r.a,winA)}</div><div class="stamp ${vcls}" style="animation-delay:${dur+180}ms">${vtxt}</div>`};
+  const vtxt={p:T('你赢下这一局','You win the round'),a:T('对手赢下这一局','Opponent wins the round'),tie:T('平局 · 双方各得一胜','Tie · both score a win')}[r.res];
+  return{dur,html:`<div class="settle">${row('p',T('你','You'),r.cp,r.p,winP)}${row('a',T('对手','Opp.'),r.ca,r.a,winA)}</div><div class="stamp ${vcls}" style="animation-delay:${dur+180}ms">${vtxt}</div>`};
 }
 function overlayFor(V){
   if(UI.ov)return UI.ov;
   if((V.phase==='roundEnd'||V.phase==='over')&&UI.dismissed!==V.phase+V.round+V.results.length)return V.phase;
   return null;
 }
-const RULES=`<ul>
+const RULES=()=>T(`<ul>
   <li>双方各有一副 1–16 的牌。开局抽 10 张，手牌上限 10。先手可换牌 3 次，后手 2 次，换下的牌在换牌结束前不会再抽到。</li>
   <li>先手在第一局场上直接获得 3 点。之后每局由上一局赢家先手（平局不变）。</li>
   <li>双方交替出牌，每次一张；也可以放弃跟牌。放弃后本局不能再出，对手仍可继续。</li>
   <li>第二、三局开始时各抽 3 张，之后可换牌 2 次；抽牌超出手牌上限的部分，额外变成换牌次数。</li>
   <li>决胜局（第三局，或第一局打平后的第二局）换完牌后，所有手牌自动一次性打出。三局两胜，平局时双方都算赢这一局。</li>
-</ul>`;
+</ul>`,`<ul>
+  <li>Each player has a deck of 16 cards, valued 1–16. Draw 10 to start; the hand limit is 10. The first player may swap 3 cards, the second player 2. Swapped-out cards can’t be drawn again until swapping ends.</li>
+  <li>The first player starts round 1 with 3 points on the board. After that, the previous round’s winner goes first (unchanged after a tie).</li>
+  <li>Players alternate, one card at a time, or pass. Once you pass you can’t play again this round, but your opponent can keep going.</li>
+  <li>Rounds 2 and 3 start with a 3-card draw, then 2 swaps. Draws that would exceed the hand limit become extra swaps.</li>
+  <li>In the deciding round (round 3, or round 2 after a tied round 1) all cards are played automatically after swapping. Best of three; a tied round counts as a win for both.</li>
+</ul>`);
 let lastKey='',lastFoot=null;
 function renderOverlay(V){
   const ov=$('#overlay'),d=$('#dialog'),o=overlayFor(V);
@@ -904,60 +932,60 @@ function renderOverlay(V){
   const inClaude=!!window.claude,netOK=typeof Peer!=='undefined'&&!inClaude;
   let h='',key=null,foot='',footDelay=0;
   if(o==='home'){
-    h=`<h2>熊之平衡</h2>
-    <p class="muted" style="margin:0">三局两胜的比点卡牌对决。</p>
-    <details><summary>规则</summary>${RULES}</details>
+    h=`<div style="display:flex;align-items:center;gap:10px"><h2 style="flex:1">${T('熊之平衡','Bear Balance')}</h2><button class="btn ghost" id="langBtn2" type="button" style="font-size:13px;padding:3px 12px">${LANG==='en'?'中文':'English'}</button></div>
+    <p class="muted" style="margin:0">${T('三局两胜的比点卡牌对决。','A best-of-three card duel: the higher total wins each round.')}</p>
+    <details><summary>${T('规则','Rules')}</summary>${RULES()}</details>
     <div class="modes">
-      ${UI.canResume?`<button class="btn full" id="resume" type="button">返回对局</button>`:''}
-      <button class="btn ${UI.canResume?'ghost ':''}full" id="modeAI" type="button">${UI.canResume?'新的人机对战':'人机对战'}</button>
-      <button class="btn ghost" id="modeQuick" type="button" ${netOK?'':'disabled'}>快速匹配</button>
-      <button class="btn ghost" id="modeHost" type="button" ${netOK?'':'disabled'}>创建房间</button>
-      <div class="join"><input id="codeIn" maxlength="5" placeholder="输入房间号" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="房间号"><button class="btn ghost" id="modeJoin" type="button">加入</button></div>
+      ${UI.canResume?`<button class="btn full" id="resume" type="button">${T('返回对局','Back to game')}</button>`:''}
+      <button class="btn ${UI.canResume?'ghost ':''}full" id="modeAI" type="button">${UI.canResume?T('新的人机对战','New game vs AI'):T('人机对战','Play vs AI')}</button>
+      <button class="btn ghost" id="modeQuick" type="button" ${netOK?'':'disabled'}>${T('快速匹配','Quick match')}</button>
+      <button class="btn ghost" id="modeHost" type="button" ${netOK?'':'disabled'}>${T('创建房间','Create room')}</button>
+      <div class="join"><input id="codeIn" maxlength="5" placeholder="${T('输入房间号','Room code')}" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="${T('房间号','Room code')}"><button class="btn ghost" id="modeJoin" type="button">${T('加入','Join')}</button></div>
     </div>
     ${UI.err?`<p class="err">${UI.err}</p>`:''}
-    ${UI.canResume&&UI.role!=='ai'?'<p class="muted" style="margin:0;font-size:12.5px;text-align:center">联机对局还在进行，开始新的对局会离开当前房间。</p>':''}
-    <p class="muted" style="margin:0;font-size:12.5px;text-align:center">${netOK?'创建房间后把房间号发给朋友；快速匹配会和正在等待的玩家配对。':inClaude?'联机请到网页版玩：cccccbt.github.io/bear-balance':'联机组件没有加载成功，请检查网络后刷新。人机对战可以正常玩。'}</p>`;
+    ${UI.canResume&&UI.role!=='ai'?`<p class="muted" style="margin:0;font-size:12.5px;text-align:center">${T('联机对局还在进行，开始新的对局会离开当前房间。','An online game is still running — starting a new one leaves this room.')}</p>`:''}
+    <p class="muted" style="margin:0;font-size:12.5px;text-align:center">${netOK?T('创建房间后把房间号发给朋友；快速匹配会和正在等待的玩家配对。','Create a room and send the code to a friend, or use Quick match to pair with a waiting player.'):inClaude?T('联机请到网页版玩：cccccbt.github.io/bear-balance','Play online at cccccbt.github.io/bear-balance'):T('联机组件没有加载成功，请检查网络后刷新。人机对战可以正常玩。','Online play failed to load — check your network and refresh. Playing vs AI still works.')}</p>`;
   }else if(o==='searching'||o==='joining'){
-    const t=o==='searching'?'正在寻找对手…':(UI.role==='guest'?'正在同步牌局…':'正在连接…');
-    h=`<h2>${o==='searching'?'快速匹配':'联机对战'}</h2><p style="margin:0;text-align:center"><span class="spin"></span>${t}</p>
-    ${o==='searching'?'<p class="muted" style="margin:0;text-align:center;font-size:12.5px">需要另一位玩家同时在匹配。可以让朋友也点“快速匹配”。</p>':''}
-    <div class="row"><button class="btn ghost" id="toLobby" type="button">取消</button></div>`;
+    const t=o==='searching'?T('正在寻找对手…','Looking for an opponent…'):(UI.role==='guest'?T('正在同步牌局…','Syncing the table…'):T('正在连接…','Connecting…'));
+    h=`<h2>${o==='searching'?T('快速匹配','Quick match'):T('联机对战','Online game')}</h2><p style="margin:0;text-align:center"><span class="spin"></span>${t}</p>
+    ${o==='searching'?`<p class="muted" style="margin:0;text-align:center;font-size:12.5px">${T('需要另一位玩家同时在匹配。可以让朋友也点“快速匹配”。','Another player has to be matching at the same time — ask a friend to tap Quick match too.')}</p>`:''}
+    <div class="row"><button class="btn ghost" id="toLobby" type="button">${T('取消','Cancel')}</button></div>`;
   }else if(o==='waiting'){
-    h=`<h2>房间已创建</h2>
-    <p class="muted" style="margin:0;text-align:center">把房间号发给朋友，让对方在大厅输入加入：</p>
+    h=`<h2>${T('房间已创建','Room created')}</h2>
+    <p class="muted" style="margin:0;text-align:center">${T('把房间号发给朋友，让对方在大厅输入加入：','Send this code to a friend and have them enter it in the lobby:')}</p>
     <div class="code">${UI.code}</div>
-    <p style="margin:0;text-align:center"><span class="spin"></span>等待对手加入…（请保持这个页面打开）</p>
-    <div class="row"><button class="btn ghost" id="copyCode" type="button">复制房间号</button><button class="btn ghost" id="toLobby" type="button">取消</button></div>`;
+    <p style="margin:0;text-align:center"><span class="spin"></span>${T('等待对手加入…（请保持这个页面打开）','Waiting for your opponent… (keep this page open)')}</p>
+    <div class="row"><button class="btn ghost" id="copyCode" type="button">${T('复制房间号','Copy code')}</button><button class="btn ghost" id="toLobby" type="button">${T('取消','Cancel')}</button></div>`;
   }else if(o==='disconnected'){
-    h=`<h2>连接已断开</h2><p class="muted" style="margin:0;text-align:center">对手离开了，或网络中断。这局无法继续。</p>
-    <div class="row"><button class="btn" id="toLobby" type="button">返回大厅</button></div>`;
+    h=`<h2>${T('连接已断开','Disconnected')}</h2><p class="muted" style="margin:0;text-align:center">${T('对手离开了，或网络中断。这局无法继续。','Your opponent left or the connection dropped. This game can’t continue.')}</p>
+    <div class="row"><button class="btn" id="toLobby" type="button">${T('返回大厅','Back to lobby')}</button></div>`;
   }else{
     const r=V.results[V.results.length-1];
     if(o==='roundEnd'){
       const st=settleHTML(r);
       footDelay=st.dur+450;
-      foot=V.ready.p?`<p style="margin:0"><span class="spin"></span><span id="autoNext">3 秒后自动开始</span></p>`
-        :`<span class="muted" id="autoNext" style="align-self:center;font-variant-numeric:tabular-nums">3 秒后自动开始</span><button class="btn" id="readyBtn" type="button">立即开始第${CN[V.round]}局</button>${V.ready.a&&UI.role!=='ai'?'<span class="muted" style="align-self:center">对手已准备</span>':''}`;
+      foot=V.ready.p?`<p style="margin:0"><span class="spin"></span><span id="autoNext">${T('3 秒后自动开始','3s until next round')}</span></p>`
+        :`<span class="muted" id="autoNext" style="align-self:center;font-variant-numeric:tabular-nums">${T('3 秒后自动开始','3s until next round')}</span><button class="btn" id="readyBtn" type="button">${T(`立即开始第${CN[V.round]}局`,`Start round ${V.round+1} now`)}</button>${V.ready.a&&UI.role!=='ai'?`<span class="muted" style="align-self:center">${T('对手已准备','Opponent is ready')}</span>`:''}`;
       key='re'+V.round+'-'+V.results.length;
-      h=`<h2>第${CN[V.round-1]}局结算</h2>${st.html}
-      <p class="muted fadein" style="margin:0;text-align:center;animation-delay:${footDelay-150}ms">总比分 你 ${V.wins.p} : ${V.wins.a} 对手 · ${(V.round>=2||(V.wins.p>=1&&V.wins.a>=1))?'下一局是决胜局，双方手牌将自动打出':`下一局${V.first==='p'?'你':'对手'}先手`}</p>`;
+      h=`<h2>${T(`第${CN[V.round-1]}局结算`,`Round ${V.round} result`)}</h2>${st.html}
+      <p class="muted fadein" style="margin:0;text-align:center;animation-delay:${footDelay-150}ms">${T(`总比分 你 ${V.wins.p} : ${V.wins.a} 对手`,`Score: you ${V.wins.p} – ${V.wins.a} opponent`)} · ${(V.round>=2||(V.wins.p>=1&&V.wins.a>=1))?T('下一局是决胜局，双方手牌将自动打出','next round is the decider — all cards play automatically'):T(`下一局${V.first==='p'?'你':'对手'}先手`,V.first==='p'?'you go first next round':'opponent goes first next round')}</p>`;
     }else{
       const w=V.wins;let fin,fc;
-      if(V.ended){fin=V.ended==='p'?'你认输了':'对手认输，你赢了';fc=V.ended==='p'?'lose':'win';}
-      else if(w.p===w.a){fin='平局';fc='tie';}else if(w.p>w.a){fin='你赢了这场对决';fc='win';}else{fin='对手赢了这场对决';fc='lose';}
-      const again=V.ready.p?`<span class="muted" style="align-self:center"><span class="spin"></span>等待对手…</span>`:`<button class="btn" id="readyBtn" type="button">再来一局</button>`;
+      if(V.ended){fin=V.ended==='p'?T('你认输了','You resigned'):T('对手认输，你赢了','Opponent resigned — you win');fc=V.ended==='p'?'lose':'win';}
+      else if(w.p===w.a){fin=T('平局','Draw');fc='tie';}else if(w.p>w.a){fin=T('你赢了这场对决','You win the match');fc='win';}else{fin=T('对手赢了这场对决','Opponent wins the match');fc='lose';}
+      const again=V.ready.p?`<span class="muted" style="align-self:center"><span class="spin"></span>${T('等待对手…','Waiting for opponent…')}</span>`:`<button class="btn" id="readyBtn" type="button">${T('再来一局','Play again')}</button>`;
       const st=(!V.ended&&r)?settleHTML(r):null;
       footDelay=st?st.dur+700:0;
       key='over'+V.results.length+(V.ended||'');
-      h=`<h2>对局结束</h2>
-      ${st?`<p class="muted" style="margin:0">第${CN[V.results.length-1]}局结算</p>${st.html}`:''}
+      h=`<h2>${T('对局结束','Game over')}</h2>
+      ${st?`<p class="muted" style="margin:0">${T(`第${CN[V.results.length-1]}局结算`,`Round ${V.results.length} result`)}</p>${st.html}`:''}
       <div class="final fadein" style="animation-delay:${footDelay-250}ms">
-        <div class="big-score">${w.p}<span>胜 · 胜</span>${w.a}</div>
+        <div class="big-score">${w.p}<span>${T('胜 · 胜','wins · wins')}</span>${w.a}</div>
         <div class="verdict ${fc}">${fin}</div>
-        ${V.results.length?`<table><tr><th>局</th><th>你</th><th>对手</th><th>结果</th></tr>
-        ${V.results.map((x,i)=>`<tr><td>第${CN[i]}局</td><td>${x.p}</td><td>${x.a}</td><td>${{p:'你赢',a:'对手赢',tie:'平'}[x.res]}</td></tr>`).join('')}</table>`:''}
+        ${V.results.length?`<table><tr><th>${T('局','Round')}</th><th>${T('你','You')}</th><th>${T('对手','Opp.')}</th><th>${T('结果','Result')}</th></tr>
+        ${V.results.map((x,i)=>`<tr><td>${RD(i+1)}</td><td>${x.p}</td><td>${x.a}</td><td>${{p:T('你赢','You'),a:T('对手赢','Opponent'),tie:T('平','Tie')}[x.res]}</td></tr>`).join('')}</table>`:''}
       </div>`;
-      foot=`${V.ready.a&&!V.ready.p&&UI.role!=='ai'?'<span class="muted" style="align-self:center">对手想再来一局</span>':''}<button class="btn ghost" id="close" type="button">查看牌桌</button>${UI.role!=='ai'?'<button class="btn ghost" id="toLobby" type="button">返回大厅</button>':''}${again}`;
+      foot=`${V.ready.a&&!V.ready.p&&UI.role!=='ai'?`<span class="muted" style="align-self:center">${T('对手想再来一局','Opponent wants a rematch')}</span>`:''}<button class="btn ghost" id="close" type="button">${T('查看牌桌','View table')}</button>${UI.role!=='ai'?`<button class="btn ghost" id="toLobby" type="button">${T('返回大厅','Back to lobby')}</button>`:''}${again}`;
     }
   }
   if(key===null)key=h;
@@ -980,10 +1008,11 @@ document.addEventListener('click',e=>{
   if(id==='modeQuick'){quickMatch(false);return;}
   if(id==='modeHost'){hostRoom();return;}
   if(id==='modeJoin'){joinRoom();return;}
+  if(id==='langBtn'||id==='langBtn2'){setLang(LANG==='en'?'zh':'en');return;}
   if(id==='menuBtn'){UI.ov='home';UI.err='';UI.canResume=true;UI.confirmResign=false;render();return;}
   if(id==='resume'){UI.ov=null;UI.canResume=false;render();return;}
   if(id==='toLobby'){toHome();return;}
-  if(id==='copyCode'){try{navigator.clipboard.writeText(UI.code).then(()=>{t.textContent='已复制';},()=>{t.textContent='请手动复制';});}catch(err){t.textContent='请手动复制';}return;}
+  if(id==='copyCode'){try{navigator.clipboard.writeText(UI.code).then(()=>{t.textContent=T('已复制','Copied');},()=>{t.textContent=T('请手动复制','Copy it manually');});}catch(err){t.textContent=T('请手动复制','Copy it manually');}return;}
   if(id==='readyBtn'){act('ready');return;}
   if(id==='resign'){if(UI.confirmResign){UI.confirmResign=false;act('resign');}else{UI.confirmResign=true;render();}return;}
   if(id==='close'){const V=currentView();if(V)UI.dismissed=V.phase+V.round+V.results.length;render();return;}
@@ -1006,7 +1035,7 @@ document.addEventListener('input',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='codeIn')joinRoom();});
 window.addEventListener('beforeunload',()=>{netReset();});
 
-newGame('ai');render();
+applyLang();newGame('ai');render();
 
 </script>
 </body>
