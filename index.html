@@ -278,7 +278,6 @@ function newGame(mode){
   S={mode,round:1,phase:'mull',first:null,bonus:null,turn:null,wins:{p:0,a:0},pl:{p:newPlayer(),a:newPlayer()},results:[],log:[],busy:false,
      notes:{p:'',a:''},fresh:null,fn:0,mdone:{p:false,a:false},ready:{p:false,a:false},ended:null,rps:{p:null,a:null},rpsLast:null,gid:Math.random().toString(36).slice(2,8),rpsN:0};
   S.phase='rps';
-  for(const w of['p','a']){draw(w,10);sortHand(w);}
   L(null,mode==='ai'?'选择先手或后手，也可以猜拳决定。':'猜拳决定先后手，赢的一方先手。',true);
 }
 const RPS={rock:'石头',scissors:'剪刀',paper:'布'},BEAT={rock:'scissors',scissors:'paper',paper:'rock'};
@@ -295,12 +294,13 @@ function pickRps(w,v){
 function setFirst(win,how){
   if(S.phase!=='rps')return;
   S.first=win;S.bonus=win;
+  for(const w of['p','a']){draw(w,10);sortHand(w);}
   S.pl[win].swaps=3;S.pl[other(win)].swaps=2;
   if(how==='rps')L(win,'猜拳获胜，先手；第一局先手直接获得 3 点。',true);
   else L(win,'先手，第一局先手直接获得 3 点。',true,'选定先后手：');
   S.phase='mull';
   if(S.mode==='ai')aiMulligan();
-  arm('mull',T_MULL);
+  arm('mull',T_MULL+(how==='rps'?4200:1800)); // 留出猜拳和发牌动画的时间
   update();
 }
 /* 限时：调度 20 秒、出牌 40 秒。计时只在本机（人机）或房主（联机）上跑。 */
@@ -550,7 +550,7 @@ function errText(e){
   return{'peer-unavailable':'没有找到这个房间号，或房主已离开','network':'网络连接失败，请检查网络后重试','server-error':'联机服务暂时不可用，请稍后再试',
     'browser-incompatible':'这个浏览器不支持联机，请换用 Chrome、Edge 或 Safari','socket-error':'联机服务连接中断'}[t]||('联机出错：'+(t||e&&e.message||'未知错误'));
 }
-function fail(msg){netReset();UI.role='ai';UI.err=msg;UI.ov='home';newGame('ai');render();}
+function fail(msg){UI.canResume=false;netReset();UI.role='ai';UI.err=msg;UI.ov='home';newGame('ai');render();}
 function onPeerError(e){
   if(UI.ov==='searching'&&e&&e.type==='peer-unavailable'&&UI.tries<3){UI.tries++;quickMatch(true);return;}
   if(UI.role==='host'&&NET.conn&&e&&e.type==='peer-unavailable')return;
@@ -634,7 +634,7 @@ async function quickJoin(){
     if(m&&m.type==='redirect'){clearTimeout(NET.timer);UI.code=m.code;try{lc.close();}catch(e){}connectTo(PFX+m.code);}
   });
 }
-function toHome(){netReset();UI.role='ai';UI.ov='home';UI.view=null;UI.confirmResign=false;newGame('ai');render();}
+function toHome(){UI.canResume=false;netReset();UI.role='ai';UI.ov='home';UI.view=null;UI.confirmResign=false;newGame('ai');render();}
 
 /* ================= Rendering ================= */
 function currentView(){
@@ -737,6 +737,7 @@ function render(){
   if(rl&&rl.res!=='tie'&&V.round===1&&(V.phase==='mull'||V.phase==='waitMull'))st+=`<span class="note">猜拳：你出${RN[rl.p]}，对手出${RN[rl.a]}，${rl.res==='p'?'你先手':'对手先手'}。</span>`;
   if(V.note)st+=`<span class="note">${V.note}</span>`;
   UI.dl=V.left!=null&&(V.phase==='mull'||V.phase==='waitMull'||V.phase==='play')?(V.recv||Date.now())+V.left:null;
+  UI.dlMax=V.phase==='play'?40:20;
   UI.dlMine=V.phase==='mull'||(V.phase==='play'&&V.turn==='p'&&!P.passed);
   if(UI.dl&&(UI.dlMine||online))st+=`<span class="clock" id="clock"></span>`;
   $('#status').innerHTML=st;tickClock();$('#actions').innerHTML=acts;
@@ -752,7 +753,7 @@ function render(){
 
 function tickClock(){
   const el=$('#clock');if(!el||!UI.dl)return;
-  const s=Math.max(0,Math.ceil((UI.dl-Date.now())/1000));
+  const s=Math.min(UI.dlMax||99,Math.max(0,Math.ceil((UI.dl-Date.now())/1000)));
   el.textContent=(UI.dlMine?(currentView()?.phase==='play'?'出牌剩余 ':'换牌剩余 '):'对手剩余 ')+s+' 秒';
   el.classList.toggle('urgent',UI.dlMine&&s<=5);
 }
@@ -791,6 +792,15 @@ function dealIn(el,delay,glow){
   el.animate([{transform:'translateY(-46px) rotateY(90deg)',opacity:0},{transform:'translateY(4px) rotateY(0deg)',opacity:1,offset:.7},{transform:'none',opacity:1}],{duration:460,delay,easing:'cubic-bezier(.2,1,.4,1)',fill:'backwards'});
   if(glow)el.animate([{boxShadow:'0 0 0 0 var(--honey)'},{boxShadow:'0 0 0 4px var(--honey)'},{boxShadow:'0 0 0 0 var(--honey)'}],{duration:1100,delay:delay+300});
 }
+function dealFly(el,from,delay,glow){
+  const to=el.getBoundingClientRect();
+  const dx=from.left+from.width/2-(to.left+to.width/2),dy=from.top+from.height/2-(to.top+to.height/2);
+  el.animate([{transform:`translate(${dx}px,${dy}px) scale(.45) rotateY(180deg) rotate(-12deg)`,opacity:0},
+    {transform:`translate(${dx*.5}px,${dy*.5-20}px) scale(.9) rotateY(90deg) rotate(-4deg)`,opacity:1,offset:.45},
+    {transform:'translateY(-6px) scale(1.06)',opacity:1,offset:.8},{transform:'none',opacity:1}],
+    {duration:620,delay,easing:'cubic-bezier(.25,.8,.3,1)',fill:'backwards'});
+  if(glow)el.animate([{boxShadow:'0 0 0 0 var(--honey)'},{boxShadow:'0 0 0 4px var(--honey)'},{boxShadow:'0 0 0 0 var(--honey)'}],{duration:1100,delay:delay+400});
+}
 function fxAfter(snap,V){
   const P=V.pl.p,A=V.pl.a;
   let pb=UI.prevBoard.p,ab=UI.prevBoard.a;
@@ -806,6 +816,14 @@ function fxAfter(snap,V){
   const target=(chips.length?chips[chips.length-1]:$('#myDeck')).getBoundingClientRect();
   removed.forEach(c=>{const r=snap.hand.get(c);if(r)ghostTo(c,r,target);});
   const mull=V.phase==='mull'||V.phase==='waitMull';
+  if(!removed.length&&added.length){ // 从牌库抽牌：一张张飞进手牌
+    const first=prev.length===0&&added.length>=5;
+    const base=first?(V.rpsLast&&V.rpsLast.n!==UI.rpsSeen?2600:200):150,gap=first?120:160;
+    const from=$('#myCount').getBoundingClientRect();
+    added.forEach((c,i)=>{const el=document.querySelector(`#hand .card[data-c="${c}"]`);if(el)dealFly(el,from,base+i*gap,!first&&mull);});
+    if(first){const ofrom=$('#oppCount').getBoundingClientRect();document.querySelectorAll('#oppBacks .back').forEach((b,i)=>dealFly(b,ofrom,base+60+i*gap,false));}
+    return;
+  }
   added.forEach((c,i)=>{const el=document.querySelector(`#hand .card[data-c="${c}"]`);if(el)dealIn(el,(removed.length?220:0)+i*(added.length>4?60:110),mull&&prev.length>0);});
 }
 
@@ -883,12 +901,14 @@ function renderOverlay(V){
     <p class="muted" style="margin:0">三局两胜的比点卡牌对决。</p>
     <details><summary>规则</summary>${RULES}</details>
     <div class="modes">
-      <button class="btn full" id="modeAI" type="button">人机对战</button>
+      ${UI.canResume?`<button class="btn full" id="resume" type="button">返回对局</button>`:''}
+      <button class="btn ${UI.canResume?'ghost ':''}full" id="modeAI" type="button">${UI.canResume?'新的人机对战':'人机对战'}</button>
       <button class="btn ghost" id="modeQuick" type="button" ${netOK?'':'disabled'}>快速匹配</button>
       <button class="btn ghost" id="modeHost" type="button" ${netOK?'':'disabled'}>创建房间</button>
       <div class="join"><input id="codeIn" maxlength="5" placeholder="输入房间号" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="房间号"><button class="btn ghost" id="modeJoin" type="button">加入</button></div>
     </div>
     ${UI.err?`<p class="err">${UI.err}</p>`:''}
+    ${UI.canResume&&UI.role!=='ai'?'<p class="muted" style="margin:0;font-size:12.5px;text-align:center">联机对局还在进行，开始新的对局会离开当前房间。</p>':''}
     <p class="muted" style="margin:0;font-size:12.5px;text-align:center">${netOK?'创建房间后把房间号发给朋友；快速匹配会和正在等待的玩家配对。':inClaude?'联机请到网页版玩：cccccbt.github.io/bear-balance':'联机组件没有加载成功，请检查网络后刷新。人机对战可以正常玩。'}</p>`;
   }else if(o==='searching'||o==='joining'){
     const t=o==='searching'?'正在寻找对手…':(UI.role==='guest'?'正在同步牌局…':'正在连接…');
@@ -949,11 +969,13 @@ document.addEventListener('click',e=>{
   const t=e.target.closest('button');if(!t||t.disabled)return;
   const id=t.id;
   if(id!=='resign')UI.confirmResign=false;
-  if(id==='modeAI'){UI.err='';UI.ov=null;UI.dismissed='';newGame('ai');render();return;}
+  if(id==='modeAI'){netReset();UI.role='ai';UI.view=null;UI.canResume=false;UI.err='';UI.ov=null;UI.dismissed='';UI.confirmResign=false;newGame('ai');render();return;}
   if(id==='modeQuick'){quickMatch(false);return;}
   if(id==='modeHost'){hostRoom();return;}
   if(id==='modeJoin'){joinRoom();return;}
-  if(id==='menuBtn'||id==='toLobby'){toHome();return;}
+  if(id==='menuBtn'){UI.ov='home';UI.err='';UI.canResume=true;UI.confirmResign=false;render();return;}
+  if(id==='resume'){UI.ov=null;UI.canResume=false;render();return;}
+  if(id==='toLobby'){toHome();return;}
   if(id==='copyCode'){try{navigator.clipboard.writeText(UI.code).then(()=>{t.textContent='已复制';},()=>{t.textContent='请手动复制';});}catch(err){t.textContent='请手动复制';}return;}
   if(id==='readyBtn'){act('ready');return;}
   if(id==='resign'){if(UI.confirmResign){UI.confirmResign=false;act('resign');}else{UI.confirmResign=true;render();}return;}
