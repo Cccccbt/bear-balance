@@ -302,46 +302,84 @@ function swapCard(w,card){
 function endMull(w){const p=S.pl[w];p.deck.push(...p.aside);p.aside=[];shuffle(p.deck);p.swaps=0;}
 function total(w){return sum(S.pl[w].board)+(S.round===1&&S.bonus===w?3:0);}
 
+// 人机：按模拟求出的近似均衡，每局随机选一种风格（先后手不同）
+const AI_STYLES={
+  first:[[.76,{m1:2,m2:4,B1:40,J:2,sL:18,sT:-15,tie1:true,raise1:true}],
+         [.10,{m1:-4,m2:2,B1:6,J:8,sL:11,sT:-14,tie1:true,raise1:true}],
+         [.14,{m1:-4,m2:0,B1:6,J:5,sL:12,sT:-14,tie1:true,raise1:true}]],
+  second:[[.67,{m1:2,m2:-1,B1:40,J:2,sL:8,sT:-13,tie1:true,raise1:true}],
+          [.28,{m1:0,m2:2,B1:0,J:8,sL:1,sT:-11,tie1:false,raise1:true}],
+          [.05,{m1:-2,m2:-1,B1:12,J:8,sL:7,sT:-10,tie1:true,raise1:true}]]};
+function aiStyle(){
+  if(!S.aiP){const Ls=AI_STYLES[S.first==='a'?'first':'second'];let r=Math.random(),k=0;
+    while(k<Ls.length-1&&r>=Ls[k][0]){r-=Ls[k][0];k++;}S.aiP=Ls[k][1];}
+  return S.aiP;
+}
 function aiMulligan(){
-  const p=S.pl.a;let n=0;
+  const P=aiStyle(),p=S.pl.a,off=S.round===1?P.m1:S.round===2?P.m2:0;let n=0;
   while(p.swaps>0&&p.deck.length){
     const avg=sum(p.deck)/p.deck.length;
-    if(p.hand[0]<avg-1){swapCard('a',p.hand[0]);n++;}else break;
+    if(p.hand[0]<avg+off){swapCard('a',p.hand[0]);n++;}else break;
   }
   if(n)L('a',`调度了 ${n} 次`);
   endMull('a');S.mdone.a=true;
 }
+// 预计第三局点数：手牌 + 抽牌期望 + 换牌收益
+function r3Expect(H,D,room){
+  const d=Math.min(3,room,D.length),da=D.length?sum(D)/D.length:0;
+  let t=sum(H)+d*da,sw=2+(3-Math.min(3,room)),left=D.length-d;
+  for(const c of H.slice().sort((x,y)=>x-y)){if(sw<=0||left<=0||c>=da)break;t+=da-c;sw--;left--;}
+  return t;
+}
+function oppR3(p){
+  const pl=new Set(p.played),U=[];for(let v=1;v<=16;v++)if(!pl.has(v))U.push(v);
+  const h=p.hand.length;let t=0;
+  for(let i=0;i<12;i++){shuffle(U);t+=r3Expect(U.slice(0,h),U.slice(h),10-h);}
+  return t/12;
+}
+function aiDecide(){
+  const P=aiStyle(),me=S.pl.a,op=S.pl.p,hand=me.hand.slice().sort((x,y)=>x-y);
+  const d=total('p')-total('a'),spent=sum(me.board),nThis=me.board.length;
+  const atLeast=x=>hand.find(c=>c>=x);
+  const dump=()=>(hand.length&&hand[0]<=P.J&&nThis<3)?hand[0]:null;
+  if(S.round===1){
+    if(op.passed){
+      if(d<0||(d===0&&P.tie1))return null;
+      const c=atLeast(d+1);if(c!==undefined&&spent+c<=P.B1)return c;
+      if(P.tie1&&hand.includes(d)&&spent+d<=P.B1)return d;
+      return null;
+    }
+    if(d<=0){
+      if(P.raise1&&hand.length&&spent+hand[0]<=P.B1)return hand[0];
+      if(d<0)return null;
+    }
+    const c=atLeast(d+1);if(c!==undefined&&spent+c<=P.B1)return c;
+    if(P.tie1&&d>0&&hand.includes(d)&&spent+d<=P.B1)return d;
+    return dump();
+  }
+  const wm=S.wins.a,wo=S.wins.p;
+  if(wm>=1&&wo>=1){ // 决胜局：全押
+    if(!hand.length||(op.passed&&d<0))return null;
+    if(op.passed){const c=atLeast(d+1);if(c!==undefined)return c;const t=atLeast(d);return t!==undefined?t:hand[hand.length-1];}
+    return hand[hand.length-1];
+  }
+  const m=r3Expect(me.hand,me.deck,10-me.hand.length)-oppR3(op);
+  if(wm>wo){ // 领先：第二局打平即胜
+    if(op.passed){if(d<=0)return null;const t=atLeast(d);return t===undefined?null:t;}
+    if(d<=0)return m>=P.sL?null:(hand.length?hand[0]:null);
+    if(m>=P.sL){const j=dump();return j!==null&&j<d?j:null;}
+    const t=atLeast(d);return t===undefined?null:t;
+  }
+  // 落后：第二、三局都要赢
+  if(op.passed){if(d<0)return null;const c=atLeast(d+1);return c===undefined?null:c;}
+  if(d<0)return(m>=P.sT+4||!hand.length)?null:hand[0];
+  const c=atLeast(d+1);if(c===undefined)return null;
+  return m-c>=P.sT?c:null;
+}
 function aiAct(){
   if(S.mode!=='ai'||S.phase!=='play'||S.turn!=='a')return;
-  const me=S.pl.a,op=S.pl.p,hand=me.hand,w=S.wins;
-  const myT=total('a'),opT=total('p');
-  const spent=sum(me.board),pool=spent+sum(hand);
-  let frac=.3,mustWin=false;
-  if(S.round===2){
-    if(w.a===1&&w.p===1){frac=1;mustWin=true;}
-    else if(w.p===1&&w.a===0){frac=.6;mustWin=true;}
-  }
-  const budget=mustWin?Infinity:frac*pool;
-  const tieOK=!(w.p+1>=2&&w.a+1<2);
-  const atLeast=x=>hand.find(c=>c>=x);
-  const play=c=>doPlay('a',c),pass=()=>doPass('a');
-  if(op.passed){
-    if(myT>opT)return pass();
-    const need=opT-myT+1,c=atLeast(need),lim=mustWin?Infinity:budget*1.4+4;
-    if(c!==undefined&&spent+c<=lim)return play(c);
-    if(tieOK&&myT===opT)return pass();
-    if(tieOK){const ct=atLeast(need-1);if(ct!==undefined&&spent+ct<=lim)return play(ct);}
-    if(c===undefined){const big=hand[hand.length-1];if(spent+big<=lim)return play(big);}
-    return pass();
-  }
-  if(myT>opT){
-    if(Math.random()<.65||myT-opT>=6)return pass();
-    return spent+hand[0]<=budget?play(hand[0]):pass();
-  }
-  const need=opT-myT+1,c=atLeast(need);
-  if(c!==undefined)return spent+c<=budget?play(c):pass();
-  const big=hand[hand.length-1];
-  return spent+big<=budget?play(big):pass();
+  const c=aiDecide();
+  if(c===null||c===undefined)doPass('a');else doPlay('a',c);
 }
 function doneMull(w){
   if(S.phase!=='mull'||S.mdone[w])return;
