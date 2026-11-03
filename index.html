@@ -189,7 +189,12 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
 .srow{display:grid;grid-template-columns:3.2em 1fr auto;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;border:1px solid var(--rail)}
 .srow.won{animation:glow .5s ease var(--d) both}
 @keyframes glow{to{border-color:var(--honey);background:color-mix(in oklab,var(--honey) 12%,transparent)}}
-.who2{font-family:var(--f-display);font-size:19px}
+.who2{font-family:var(--f-display);font-size:19px;max-width:7.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who{max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.name-row{display:flex;align-items:center;gap:8px}
+.name-row label{font-size:13.5px;white-space:nowrap}
+.name-row input{flex:1;min-width:0;font:inherit;font-size:16px;padding:7px 16px;border-radius:999px;border:1.5px solid var(--rail-2);background:var(--felt);color:var(--ink)}
+.name-row input:focus-visible{outline:2px solid var(--honey);outline-offset:1px}
 .schips{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
 .schip{--cc:color-mix(in oklab,var(--lo),var(--hi) calc(var(--v)*100%));width:28px;aspect-ratio:5/7;border-radius:4px;background:var(--paper);color:var(--cc);font-family:var(--f-num);font-size:14px;display:grid;place-items:center;animation:chipIn .32s cubic-bezier(.2,1.5,.5,1) both}
 .schip.bonus-chip{background:transparent;border:1.5px dashed var(--honey);color:var(--honey);font-size:12px}
@@ -219,7 +224,7 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
 
   <section class="side" id="oppSide" aria-label="对手" data-aria-en="Opponent">
     <div class="meta">
-      <span class="who" data-en="Opponent">对手</span><span class="pips" id="oppPips"></span>
+      <span class="who" id="oppWho">对手</span><span class="pips" id="oppPips"></span>
       <span id="oppTags"></span><span class="spacer"></span>
       <span class="count" id="oppCount"></span>
     </div>
@@ -242,7 +247,7 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
   <section class="side" id="mySide" aria-label="你" data-aria-en="You">
     <div class="board" id="myBoard"></div>
     <div class="meta">
-      <span class="who" data-en="You">你</span><span class="pips" id="myPips"></span>
+      <span class="who" id="myWho">你</span><span class="pips" id="myPips"></span>
       <span id="myTags"></span><span class="spacer"></span>
       <span class="count" id="myCount"></span>
     </div>
@@ -281,6 +286,16 @@ const CN=['一','二','三'];
 /* 语言：中文 / English。记在本机，默认跟随浏览器语言 */
 let LANG=(()=>{try{const v=localStorage.getItem('bb-lang');if(v==='zh'||v==='en')return v;}catch(e){}return /^zh/i.test(navigator.language||'')?'zh':'en';})();
 const T=(zh,en)=>LANG==='en'?en:zh;
+const cleanName=s=>String(s||'').replace(/[<>&"'`\\]/g,'').replace(/\s+/g,' ').trim().slice(0,12);
+const defaultName=()=>'老熊'+(Math.floor(Math.random()*900)+100);
+let MYNAME=(()=>{let v='';try{v=cleanName(localStorage.getItem('bb-name'));}catch(e){}
+  if(!v){v=defaultName();try{localStorage.setItem('bb-name',v);}catch(e){}}return v;})();
+function setMyName(v,commit){
+  v=cleanName(v);
+  if(!v){if(!commit)return;v=defaultName();}
+  MYNAME=v;try{localStorage.setItem('bb-name',v);}catch(e){}
+}
+const oppName=V=>V&&V.mode==='ai'?T('电脑','AI'):cleanName(V&&V.names&&V.names.a)||T('对手','Opponent');
 const TT=x=>Array.isArray(x)?T(x[0],x[1]):(x||'');
 const RD=r=>T(`第${CN[r-1]}局`,`Round ${r}`);
 const rpsN=k=>TT(RPS[k]);
@@ -527,15 +542,16 @@ function viewFor(me){
     log:S.log.map(l=>({who:l.who?(l.who===me?'p':'a'):null,t:l.t,pre:l.pre,r:l.r})),
     busy:S.busy&&S.turn===op,note:S.notes[me],fresh:S.fresh&&{w:F(S.fresh.w),card:S.fresh.card,n:S.fresh.n},
     gid:S.gid,ready:{p:S.ready[me],a:S.ready[op]},left:S.dl?Math.max(0,S.dl-Date.now()):null,ended:S.ended?F(S.ended):null,
+    names:{p:me==='p'?MYNAME:(UI.remoteName||''),a:me==='p'?(S.mode==='ai'?'':(UI.remoteName||'')):MYNAME},
     rpsMine:S.rps?S.rps[me]:null,rpsLast:rl&&{p:rl[me],a:rl[op],res:rl.res==='tie'?'tie':F(rl.res),n:rl.n},
     pl:{p:{deck:[...P.deck],hand:[...P.hand],aside:[...P.aside],swaps:P.swaps,board:[...P.board],passed:P.passed,played:[...P.played]},
         a:{deckCount:A.deck.length+A.aside.length,handCount:A.hand.length,board:[...A.board],passed:A.passed,played:[...A.played]}}};
 }
 
 /* ================= Network (PeerJS) ================= */
-const UI={prevHand:null,prevBoard:{p:0,a:0},rpsSeen:null,sel:null,selKey:'',role:'ai',ov:'home',view:null,dismissed:'',animN:-1,err:'',code:'',kind:'',confirmResign:false,qStart:0};
+const UI={remoteName:'',oppLabel:'',prevHand:null,prevBoard:{p:0,a:0},rpsSeen:null,sel:null,selKey:'',role:'ai',ov:'home',view:null,dismissed:'',animN:-1,err:'',code:'',kind:'',confirmResign:false,qStart:0};
 const NET={peer:null,lobby:null,conn:null,timer:null,qNext:null};
-const APP_VER='11.03b';
+const APP_VER='11.03c';
 const QSLOTS=4,QMAX=180000;let qGen=0;
 const qAlive=g=>g===qGen&&UI.ov==='searching'&&UI.kind==='quick';
 
@@ -584,7 +600,7 @@ function onConnClose(c){
 }
 function acceptConn(c){
   if(NET.conn){c.on('open',()=>{try{c.send({type:'full'});}catch(e){}setTimeout(()=>{try{c.close();}catch(e){}},400);});return;}
-  NET.conn=c;
+  NET.conn=c;UI.remoteName='';
   if(UI.kind==='quick'){clearTimeout(NET.timer);NET.timer=setTimeout(()=>{if(NET.conn===c&&!c.open&&UI.ov==='searching')qRetry();},20000);}
   let started=false;
   const start=()=>{
@@ -602,6 +618,7 @@ function acceptConn(c){
   });
   c.on('data',m=>{
     if(!m||!m.type)return;
+    if(m.type==='hello'&&m.name)UI.remoteName=cleanName(m.name);
     if(!started){if(m.type==='hello'){start();}else if(UI.kind==='quick')drop();return;}
     if(m.type==='hello')update();else apply('a',m.type,m.c);
   });
@@ -613,13 +630,13 @@ function connectTo(id){
   NET.conn=c;
   clearTimeout(NET.timer);
   NET.timer=setTimeout(()=>{if(c.open)return;if(UI.kind==='quick'&&UI.ov==='searching'){if(NET.qNext)NET.qNext();else qRetry();return;}fail(T('连接超时：房间可能已关闭，或网络不支持直连','Connection timed out: the room may be closed, or your network blocks direct connections'));},UI.kind==='quick'?16000:20000);
-  c.on('open',()=>{clearTimeout(NET.timer);UI.role='guest';UI.view=null;UI.dismissed='';UI.animN=-1;c.send({type:'hello'});render();});
+  c.on('open',()=>{clearTimeout(NET.timer);UI.role='guest';UI.view=null;UI.dismissed='';UI.animN=-1;c.send({type:'hello',name:MYNAME});render();});
   c.on('data',m=>{
     if(!m)return;
     if(m.type==='view'){UI.view=m.v;UI.view.recv=Date.now();if(UI.ov==='joining'||UI.ov==='searching')UI.ov=null;render();}
     else if(m.type==='redirect'&&m.code&&UI.ov==='searching'){clearTimeout(NET.timer);NET.qNext=null;const old=NET.conn;NET.conn=null;try{old.close();}catch(e){}connectTo(PFX+m.code);}
     else if(m.type==='outdated'){if(UI.kind==='quick'&&UI.ov==='searching')qRetry();else fail(T('对方的页面版本太旧，请双方都刷新页面后再试','The other player is on an old version — both of you refresh and try again'));}
-    else if(m.type==='full'){if(UI.kind==='quick'&&UI.ov==='searching')qRetry();else fail(T('这个房间已经满了','This room is full'));}
+    else if(m.type==='full'){if(UI.kind==='quick'&&UI.ov==='searching'){if(NET.qNext)NET.qNext();else qRetry();}else fail(T('这个房间已经满了','This room is full'));}
   });
   c.on('close',()=>onConnClose(c));
   c.on('error',()=>{});
@@ -730,6 +747,8 @@ function render(){
   const V=currentView()||blankView();
   const P=V.pl.p,A=V.pl.a;
   const online=UI.role!=='ai';
+  UI.oppLabel=oppName(V);
+  {const mw=$('#myWho'),ow=$('#oppWho');if(mw&&mw.textContent!==MYNAME)mw.textContent=MYNAME;if(ow&&ow.textContent!==UI.oppLabel)ow.textContent=UI.oppLabel;}
   const snap=fxSnapshot();
   $('#modeTag').textContent=online?(UI.kind==='quick'?T('快速匹配','Quick match'):T(`联机 · 房间 ${UI.code}`,`Online · Room ${UI.code}`)):T('人机','vs AI');
   $('#rounds').innerHTML=[1,2,3].map(r=>{
@@ -912,9 +931,9 @@ function showRps(rl){
   const cls=rl.res==='tie'?'tie':rl.res==='p'?'win':'lose';
   fx.innerHTML=`<div class="fx-box" role="dialog" aria-label="${T('猜拳结果','Rock-paper-scissors result')}">
     <div class="rps-row">
-      <div class="rps-side"><div class="hand-ico shake" id="rpsP">${ICON.rock}</div><span class="lbl">${T('你','You')}</span></div>
+      <div class="rps-side"><div class="hand-ico shake" id="rpsP">${ICON.rock}</div><span class="lbl">${MYNAME}</span></div>
       <span class="rps-vs">VS</span>
-      <div class="rps-side"><div class="hand-ico shake opp" id="rpsA">${ICON.rock}</div><span class="lbl">${T('对手','Opponent')}</span></div>
+      <div class="rps-side"><div class="hand-ico shake opp" id="rpsA">${ICON.rock}</div><span class="lbl">${UI.oppLabel||T('对手','Opponent')}</span></div>
     </div>
     <div class="rps-res" id="rpsRes">${T('石头、剪刀、布……','Rock, paper, scissors…')}</div></div>`;
   fx.hidden=false;
@@ -948,7 +967,7 @@ function settleHTML(r){
   };
   const vcls={p:'win',a:'lose',tie:'tie'}[r.res];
   const vtxt={p:T('你赢下这一局','You win the round'),a:T('对手赢下这一局','Opponent wins the round'),tie:T('平局 · 双方各得一胜','Tie · both score a win')}[r.res];
-  return{dur,html:`<div class="settle">${row('p',T('你','You'),r.cp,r.p,winP)}${row('a',T('对手','Opp.'),r.ca,r.a,winA)}</div><div class="stamp ${vcls}" style="animation-delay:${dur+180}ms">${vtxt}</div>`};
+  return{dur,html:`<div class="settle">${row('p',MYNAME,r.cp,r.p,winP)}${row('a',UI.oppLabel||T('对手','Opp.'),r.ca,r.a,winA)}</div><div class="stamp ${vcls}" style="animation-delay:${dur+180}ms">${vtxt}</div>`};
 }
 function overlayFor(V){
   if(UI.ov)return UI.ov;
@@ -979,6 +998,7 @@ function renderOverlay(V){
     h=`<div style="display:flex;align-items:center;gap:10px"><h2 style="flex:1">${T('熊之平衡','Bear Balance')}</h2><button class="btn ghost" id="langBtn2" type="button" style="font-size:13px;padding:3px 12px">${LANG==='en'?'中文':'English'}</button></div>
     <p class="muted" style="margin:0">${T('三局两胜的比点卡牌对决。','A best-of-three card duel: the higher total wins each round.')}</p>
     <details><summary>${T('规则','Rules')}</summary>${RULES()}</details>
+    <div class="name-row"><label for="nameIn">${T('你的名字','Your name')}</label><input id="nameIn" maxlength="12" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="${T('你的名字','Your name')}"></div>
     <div class="modes">
       ${UI.canResume?`<button class="btn full" id="resume" type="button">${T('返回对局','Back to game')}</button>`:''}
       <button class="btn ${UI.canResume?'ghost ':''}full" id="modeAI" type="button">${UI.canResume?T('新的人机对战','New game vs AI'):T('人机对战','Play vs AI')}</button>
@@ -1039,6 +1059,7 @@ function renderOverlay(V){
     d.innerHTML=h+`<div class="row dlg-foot fadein" id="dlgFoot" style="animation-delay:${footDelay}ms"></div>`;
     lastKey=key;lastFoot=null;
     if(keep&&$('#codeIn'))$('#codeIn').value=keep;
+    if($('#nameIn'))$('#nameIn').value=MYNAME;
     runCounters(d);
   }
   if(foot!==lastFoot){$('#dlgFoot').innerHTML=foot;lastFoot=foot;}
@@ -1073,11 +1094,13 @@ document.addEventListener('click',e=>{
   }
 });
 document.addEventListener('input',e=>{
+  if(e.target.id==='nameIn'){setMyName(e.target.value,false);return;}
   if(e.target.id!=='codeIn')return;
   const v=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
   if(v!==e.target.value)e.target.value=v;
 });
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='codeIn')joinRoom();});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='codeIn')joinRoom();if(e.key==='Enter'&&e.target.id==='nameIn')e.target.blur();});
+document.addEventListener('change',e=>{if(e.target.id==='nameIn'){setMyName(e.target.value,true);e.target.value=MYNAME;render();}});
 window.addEventListener('beforeunload',()=>{netReset();});
 
 applyLang();newGame('ai');render();
