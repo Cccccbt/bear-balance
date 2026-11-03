@@ -535,6 +535,7 @@ function viewFor(me){
 /* ================= Network (PeerJS) ================= */
 const UI={prevHand:null,prevBoard:{p:0,a:0},rpsSeen:null,sel:null,selKey:'',role:'ai',ov:'home',view:null,dismissed:'',animN:-1,err:'',code:'',kind:'',confirmResign:false,qStart:0};
 const NET={peer:null,lobby:null,conn:null,timer:null,qNext:null};
+const APP_VER='11.03b';
 const QSLOTS=4,QMAX=180000;let qGen=0;
 const qAlive=g=>g===qGen&&UI.ov==='searching'&&UI.kind==='quick';
 
@@ -585,13 +586,25 @@ function acceptConn(c){
   if(NET.conn){c.on('open',()=>{try{c.send({type:'full'});}catch(e){}setTimeout(()=>{try{c.close();}catch(e){}},400);});return;}
   NET.conn=c;
   if(UI.kind==='quick'){clearTimeout(NET.timer);NET.timer=setTimeout(()=>{if(NET.conn===c&&!c.open&&UI.ov==='searching')qRetry();},20000);}
-  c.on('open',()=>{
-    clearTimeout(NET.timer);NET.qNext=null;
+  let started=false;
+  const start=()=>{
+    if(started)return;started=true;clearTimeout(NET.timer);NET.qNext=null;
     if(NET.lobby){try{NET.lobby.destroy();}catch(e){}NET.lobby=null;}
     if(UI.kind==='quick'){const p=NET.peer;setTimeout(()=>{try{p&&!p.destroyed&&p.disconnect();}catch(e){}},500);}
     UI.role='host';UI.ov=null;UI.dismissed='';UI.animN=-1;newGame('host');update();
+  };
+  /* quick match: only start once the other side proves it speaks this protocol ('hello');
+     an outdated page (cached old version) is dropped and we keep waiting for the next player */
+  const drop=()=>{if(NET.conn!==c)return;NET.conn=null;clearTimeout(NET.timer);try{c.send({type:'outdated'});}catch(e){}setTimeout(()=>{try{c.close();}catch(e){}},400);};
+  c.on('open',()=>{
+    if(UI.kind==='quick'&&UI.ov==='searching'){clearTimeout(NET.timer);NET.timer=setTimeout(drop,8000);return;}
+    start();
   });
-  c.on('data',m=>{if(!m||!m.type)return;if(m.type==='hello')update();else apply('a',m.type,m.c);});
+  c.on('data',m=>{
+    if(!m||!m.type)return;
+    if(!started){if(m.type==='hello'){start();}else if(UI.kind==='quick')drop();return;}
+    if(m.type==='hello')update();else apply('a',m.type,m.c);
+  });
   c.on('close',()=>onConnClose(c));
   c.on('error',()=>{});
 }
@@ -604,6 +617,8 @@ function connectTo(id){
   c.on('data',m=>{
     if(!m)return;
     if(m.type==='view'){UI.view=m.v;UI.view.recv=Date.now();if(UI.ov==='joining'||UI.ov==='searching')UI.ov=null;render();}
+    else if(m.type==='redirect'&&m.code&&UI.ov==='searching'){clearTimeout(NET.timer);NET.qNext=null;const old=NET.conn;NET.conn=null;try{old.close();}catch(e){}connectTo(PFX+m.code);}
+    else if(m.type==='outdated'){if(UI.kind==='quick'&&UI.ov==='searching')qRetry();else fail(T('对方的页面版本太旧，请双方都刷新页面后再试','The other player is on an old version — both of you refresh and try again'));}
     else if(m.type==='full'){if(UI.kind==='quick'&&UI.ov==='searching')qRetry();else fail(T('这个房间已经满了','This room is full'));}
   });
   c.on('close',()=>onConnClose(c));
@@ -973,7 +988,8 @@ function renderOverlay(V){
     </div>
     ${UI.err?`<p class="err">${UI.err}</p>`:''}
     ${UI.canResume&&UI.role!=='ai'?`<p class="muted" style="margin:0;font-size:12.5px;text-align:center">${T('联机对局还在进行，开始新的对局会离开当前房间。','An online game is still running — starting a new one leaves this room.')}</p>`:''}
-    <p class="muted" style="margin:0;font-size:12.5px;text-align:center">${netOK?T('创建房间后把房间号发给朋友；快速匹配会和正在等待的玩家配对。','Create a room and send the code to a friend, or use Quick match to pair with a waiting player.'):inClaude?T('联机请到网页版玩：cccccbt.github.io/bear-balance','Play online at cccccbt.github.io/bear-balance'):T('联机组件没有加载成功，请检查网络后刷新。人机对战可以正常玩。','Online play failed to load — check your network and refresh. Playing vs AI still works.')}</p>`;
+    <p class="muted" style="margin:0;font-size:12.5px;text-align:center">${netOK?T('创建房间后把房间号发给朋友；快速匹配会和正在等待的玩家配对。','Create a room and send the code to a friend, or use Quick match to pair with a waiting player.'):inClaude?T('联机请到网页版玩：cccccbt.github.io/bear-balance','Play online at cccccbt.github.io/bear-balance'):T('联机组件没有加载成功，请检查网络后刷新。人机对战可以正常玩。','Online play failed to load — check your network and refresh. Playing vs AI still works.')}</p>
+    <p class="muted" style="margin:0;font-size:11px;text-align:center;opacity:.6">${T('版本','Version')} ${APP_VER}</p>`;
   }else if(o==='searching'||o==='joining'){
     const t=o==='searching'?T('正在寻找对手…','Looking for an opponent…'):(UI.role==='guest'?T('正在同步牌局…','Syncing the table…'):T('正在连接…','Connecting…'));
     h=`<h2>${o==='searching'?T('快速匹配','Quick match'):T('联机对战','Online game')}</h2><p style="margin:0;text-align:center"><span class="spin"></span>${t}</p>
