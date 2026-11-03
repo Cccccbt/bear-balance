@@ -74,8 +74,10 @@ button.card:not([disabled]){cursor:pointer;transition:transform .15s ease}
 button.card:not([disabled]):hover,button.card:not([disabled]):focus-visible{transform:translateY(-6px)}
 button.card:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
 .hand.idle .card{filter:saturate(.55) brightness(.82)}
-.hand.mull button.card:not([disabled])::before{content:"换";position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;background:var(--honey);color:var(--honey-ink);font-family:var(--f-body);font-size:11px;display:grid;place-items:center;opacity:0;transition:opacity .15s;z-index:1}
-.hand.mull button.card:not([disabled]):hover::before,.hand.mull button.card:not([disabled]):focus-visible::before{opacity:1}
+.hand button.card.sel,.hand button.card.sel:hover{transform:translateY(-10px);box-shadow:0 0 0 2px var(--honey),0 10px 18px -8px var(--shade)}
+.hand button.card.sel::before{content:"出";position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:var(--honey);color:var(--honey-ink);font-family:var(--f-body);font-size:12px;display:grid;place-items:center;opacity:1;z-index:1}
+.hand.mull button.card.sel::before{content:"换"}
+.btn.rps{min-width:76px;font-size:16px}
 .card.new{animation:drop .38s cubic-bezier(.2,1.3,.5,1) both}
 @keyframes drop{from{transform:translateY(-14px) scale(1.08);opacity:0}to{transform:none;opacity:1}}
 .hand{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;padding-top:8px;min-height:calc(var(--hand-w)*1.4 + 8px)}
@@ -228,12 +230,26 @@ let S=null;
 function newPlayer(){return{deck:shuffle(Array.from({length:16},(_,i)=>i+1)),hand:[],board:[],passed:false,aside:[],swaps:0,played:[]};}
 function newGame(mode){
   S={mode,round:1,phase:'mull',first:null,bonus:null,turn:null,wins:{p:0,a:0},pl:{p:newPlayer(),a:newPlayer()},results:[],log:[],busy:false,
-     notes:{p:'',a:''},fresh:null,fn:0,mdone:{p:false,a:false},ready:{p:false,a:false},ended:null};
-  S.first=Math.random()<.5?'p':'a';S.bonus=S.first;
+     notes:{p:'',a:''},fresh:null,fn:0,mdone:{p:false,a:false},ready:{p:false,a:false},ended:null,rps:{p:null,a:null},rpsLast:null};
+  S.phase='rps';
   for(const w of['p','a']){draw(w,10);sortHand(w);}
-  S.pl[S.first].swaps=3;S.pl[other(S.first)].swaps=2;
-  L(S.first,'先手，第一局先手直接获得 3 点。',true,'掷硬币：');
-  if(mode==='ai')aiMulligan();
+  L(null,'猜拳决定先后手，赢的一方先手。',true);
+}
+const RPS={rock:'石头',scissors:'剪刀',paper:'布'},BEAT={rock:'scissors',scissors:'paper',paper:'rock'};
+function pickRps(w,v){
+  if(S.phase!=='rps'||S.rps[w]||!RPS[v])return;
+  S.rps[w]=v;
+  if(S.mode==='ai'&&!S.rps.a)S.rps.a=Object.keys(RPS)[Math.floor(Math.random()*3)];
+  if(!(S.rps.p&&S.rps.a)){update();return;}
+  const{p,a}=S.rps;S.rps={p:null,a:null};
+  if(p===a){S.rpsLast={p,a,res:'tie'};L(null,`猜拳：双方都出${RPS[p]}，平局重来`);update();return;}
+  const win=BEAT[p]===a?'p':'a';
+  S.rpsLast={p,a,res:win};S.first=win;S.bonus=win;
+  S.pl[win].swaps=3;S.pl[other(win)].swaps=2;
+  L(win,'猜拳获胜，先手；第一局先手直接获得 3 点。',true);
+  S.phase='mull';
+  if(S.mode==='ai')aiMulligan();
+  update();
 }
 function L(who,t,r,pre){S.log.push({who,t,r:!!r,pre:pre||''});if(S.log.length>80)S.log.shift();}
 function draw(w,n){const p=S.pl[w];let k=0;while(k<n&&p.deck.length){p.hand.push(p.deck.pop());k++;}return k;}
@@ -371,6 +387,7 @@ function apply(w,type,c){
     if(S.phase==='play'&&S.turn===w&&!S.pl[w].passed&&!S.busy)doPass(w);
   }else if(type==='ready')setReady(w);
   else if(type==='resign')resign(w);
+  else if(type==='rps')pickRps(w,c);
 }
 
 /* What seat `me` is allowed to see. */
@@ -378,18 +395,21 @@ function viewFor(me){
   const op=other(me),F=w=>w===me?'p':w===op?'a':w;
   const P=S.pl[me],A=S.pl[op];
   let phase=S.phase;if(phase==='mull'&&S.mdone[me])phase='waitMull';
+  if(phase==='rps'&&S.rps[me])phase='waitRps';
+  const rl=S.rpsLast;
   return{mode:S.mode,round:S.round,phase,first:F(S.first),bonus:F(S.bonus),turn:F(S.turn),
     wins:{p:S.wins[me],a:S.wins[op]},tot:{p:total(me),a:total(op)},
     results:S.results.map(r=>({p:r[me],a:r[op],res:r.res==='tie'?'tie':F(r.res)})),
     log:S.log.map(l=>({t:l.pre+(l.who?(l.who===me?'你':'对手'):'')+l.t,r:l.r})),
     busy:S.busy&&S.turn===op,note:S.notes[me],fresh:S.fresh&&{w:F(S.fresh.w),card:S.fresh.card,n:S.fresh.n},
     ready:{p:S.ready[me],a:S.ready[op]},ended:S.ended?F(S.ended):null,
+    rpsMine:S.rps?S.rps[me]:null,rpsLast:rl&&{p:rl[me],a:rl[op],res:rl.res==='tie'?'tie':F(rl.res)},
     pl:{p:{deck:[...P.deck],hand:[...P.hand],aside:[...P.aside],swaps:P.swaps,board:[...P.board],passed:P.passed,played:[...P.played]},
         a:{deckCount:A.deck.length+A.aside.length,handCount:A.hand.length,board:[...A.board],passed:A.passed,played:[...A.played]}}};
 }
 
 /* ================= Network (PeerJS) ================= */
-const UI={role:'ai',ov:'home',view:null,dismissed:'',animN:-1,err:'',code:'',kind:'',confirmResign:false,tries:0};
+const UI={sel:null,selKey:'',role:'ai',ov:'home',view:null,dismissed:'',animN:-1,err:'',code:'',kind:'',confirmResign:false,tries:0};
 const NET={peer:null,lobby:null,conn:null,timer:null};
 
 function update(){
@@ -511,7 +531,7 @@ function currentView(){
 }
 function cardHTML(c,o={}){
   const st=`--v:${((c-1)/15).toFixed(3)}`+(o.delay!=null?`;animation-delay:${o.delay}ms`:'');
-  if(o.btn)return`<button type="button" class="card" style="${st}" data-c="${c}" ${o.disabled?'disabled':''} aria-label="${o.label||''}${c} 点"><span class="ix">${c}</span><span class="big">${c}</span></button>`;
+  if(o.btn)return`<button type="button" class="card${o.sel?' sel':''}" style="${st}" data-c="${c}" ${o.disabled?'disabled':''} aria-label="${o.label||''}${c} 点"><span class="ix">${c}</span><span class="big">${c}</span></button>`;
   return`<div class="card ${o.cls||''}" style="${st}"><span class="ix">${c}</span><span class="big">${c}</span></div>`;
 }
 function boardHTML(V,w,animate){
@@ -546,7 +566,7 @@ function render(){
   $('#rounds').innerHTML=[1,2,3].map(r=>{
     const res=V.results[r-1];let cls='',txt='—';
     if(res){cls={p:'win',a:'lose',tie:'tie'}[res.res];txt=`${res.p}:${res.a}`;}
-    else if(r===V.round&&V.phase!=='over'&&V.phase!=='wait'){cls='cur';txt=(V.phase==='mull'||V.phase==='waitMull')?'换牌':'进行中';}
+    else if(r===V.round&&V.phase!=='over'&&V.phase!=='wait'){cls='cur';txt=(V.phase==='rps'||V.phase==='waitRps')?'猜拳':(V.phase==='mull'||V.phase==='waitMull')?'换牌':'进行中';}
     return`<li class="${cls}"><b>第${CN[r-1]}局</b><span>${txt}</span></li>`;
   }).join('');
   $('#oppPips').innerHTML=pips(V.wins.a);$('#myPips').innerHTML=pips(V.wins.p);
@@ -563,9 +583,11 @@ function render(){
 
   const canSwap=V.phase==='mull'&&P.swaps>0&&P.deck.length>0;
   const canPlay=V.phase==='play'&&V.turn==='p'&&!V.busy&&!P.passed;
+  const selKey=V.phase+V.round+V.turn;
+  if(UI.selKey!==selKey||!(canSwap||canPlay)||!P.hand.includes(UI.sel)){UI.sel=null;UI.selKey=selKey;}
   const hand=$('#hand');
   hand.className='hand'+(V.phase==='mull'?' mull':'')+(!canSwap&&!canPlay?' idle':'');
-  hand.innerHTML=P.hand.map(c=>cardHTML(c,{btn:true,disabled:!(canSwap||canPlay),label:V.phase==='mull'?'换掉 ':'打出 '})).join('')||'<span class="muted">没有手牌</span>';
+  hand.innerHTML=P.hand.map(c=>cardHTML(c,{btn:true,sel:c===UI.sel,disabled:!(canSwap||canPlay),label:V.phase==='mull'?'换掉 ':'打出 '})).join('')||'<span class="muted">没有手牌</span>';
   const aside=$('#aside');
   aside.hidden=!(V.phase==='mull'&&P.aside.length);
   aside.innerHTML='已换下（换牌结束后洗回牌库）：'+P.aside.map(c=>`<span class="chip set">${c}</span>`).join('');
@@ -577,7 +599,14 @@ function render(){
   $('#panL').style.transform=`translateY(${-dy}px)`;$('#panR').style.transform=`translateY(${dy}px)`;
 
   let st='',acts='';
-  if(V.phase==='mull'){
+  const rl=V.rpsLast,RN=RPS;
+  if(V.phase==='rps'){
+    st='猜拳决定先后手：赢的一方先手（第一局 +3 点，可换牌 3 次）。';
+    if(rl&&rl.res==='tie')st+=`<span class="note">刚才双方都出了${RN[rl.p]}，再来一次。</span>`;
+    acts=Object.keys(RN).map(k=>`<button class="btn ghost rps" data-rps="${k}" type="button">${RN[k]}</button>`).join('');
+  }else if(V.phase==='waitRps'){
+    st=`<span class="spin"></span>你出了${RN[V.rpsMine]}，等待对手出拳…`;
+  }else if(V.phase==='mull'){
     st=P.deck.length?`换牌：点击想换掉的牌，还能换 <b>${P.swaps}</b> 次。换下的牌在换牌结束前不会再抽到。`:'牌库已空，无法换牌。';
     acts=`<button class="btn" id="doneMull" type="button">完成换牌</button>`;
   }else if(V.phase==='waitMull')st='<span class="spin"></span>等待对手完成换牌…';
@@ -587,8 +616,10 @@ function render(){
     if(canPlay)acts=`<button class="btn ghost" id="passBtn" type="button">放弃跟牌</button>`;
   }else if(V.phase==='auto')st='第三局：双方所有手牌一次性自动打出。';
   else if(V.phase==='roundEnd'||V.phase==='over')st='本局结束。';
-  if(online&&!['over','wait'].includes(V.phase))acts+=`<button class="btn ghost" id="resign" type="button">${UI.confirmResign?'确认认输':'认输'}</button>`;
+  if(online&&!['over','wait','rps','waitRps'].includes(V.phase))acts+=`<button class="btn ghost" id="resign" type="button">${UI.confirmResign?'确认认输':'认输'}</button>`;
   if(V.phase==='over'&&!overlayFor(V))acts=`<button class="btn" id="readyBtn" type="button" ${V.ready.p?'disabled':''}>${V.ready.p?'等待对手…':'再来一局'}</button>`;
+  if(UI.sel!=null)st=`已选 <b>${UI.sel}</b>，再点一次这张牌确认${V.phase==='mull'?'换掉':'打出'}。`;
+  if(rl&&rl.res!=='tie'&&V.round===1&&(V.phase==='mull'||V.phase==='waitMull'))st+=`<span class="note">猜拳：你出${RN[rl.p]}，对手出${RN[rl.a]}，${rl.res==='p'?'你先手':'对手先手'}。</span>`;
   if(V.note)st+=`<span class="note">${V.note}</span>`;
   $('#status').innerHTML=st;$('#actions').innerHTML=acts;
 
@@ -625,7 +656,7 @@ function renderOverlay(V){
       <button class="btn full" id="modeAI" type="button">人机对战</button>
       <button class="btn ghost" id="modeQuick" type="button" ${netOK?'':'disabled'}>快速匹配</button>
       <button class="btn ghost" id="modeHost" type="button" ${netOK?'':'disabled'}>创建房间</button>
-      <div class="join"><input id="codeIn" maxlength="5" placeholder="房间号" autocomplete="off" aria-label="房间号" ${netOK?'':'disabled'}><button class="btn ghost" id="modeJoin" type="button" ${netOK?'':'disabled'}>加入</button></div>
+      <div class="join"><input id="codeIn" maxlength="5" placeholder="房间号" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="房间号" ${netOK?'':'disabled'}><button class="btn ghost" id="modeJoin" type="button" ${netOK?'':'disabled'}>加入</button></div>
     </div>
     ${UI.err?`<p class="err">${UI.err}</p>`:''}
     <p class="muted" style="margin:0;font-size:12.5px;text-align:center">${netOK?'创建房间后把房间号发给朋友；快速匹配会和正在等待的玩家配对。':'联机组件没有加载成功，请检查网络后刷新。人机对战可以正常玩。'}</p>`;
@@ -691,10 +722,18 @@ document.addEventListener('click',e=>{
   if(id==='close'){const V=currentView();if(V)UI.dismissed=V.phase+V.round+V.results.length;render();return;}
   if(id==='doneMull'){act('done');return;}
   if(id==='passBtn'){act('pass');return;}
+  if(t.dataset.rps){act('rps',t.dataset.rps);return;}
   if(t.classList.contains('card')){
     const V=currentView();if(!V)return;const c=+t.dataset.c;
+    if(UI.sel!==c){UI.sel=c;render();return;}
+    UI.sel=null;
     if(V.phase==='mull')act('swap',c);else if(V.phase==='play')act('play',c);
   }
+});
+document.addEventListener('input',e=>{
+  if(e.target.id!=='codeIn')return;
+  const v=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+  if(v!==e.target.value)e.target.value=v;
 });
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='codeIn')joinRoom();});
 window.addEventListener('beforeunload',()=>{netReset();});
