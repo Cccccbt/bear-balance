@@ -278,7 +278,8 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
 <div class="overlay" id="overlay" hidden><div class="dialog" id="dialog"></div></div>
 
 
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.2.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.2.0/firebase-database-compat.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 const sum=a=>a.reduce((x,y)=>x+y,0);
@@ -548,167 +549,185 @@ function viewFor(me){
         a:{deckCount:A.deck.length+A.aside.length,handCount:A.hand.length,board:[...A.board],passed:A.passed,played:[...A.played]}}};
 }
 
-/* ================= Network (PeerJS) ================= */
+/* ================= Network (Firebase Realtime Database) ================= */
 const UI={remoteName:'',oppLabel:'',prevHand:null,prevBoard:{p:0,a:0},rpsSeen:null,sel:null,selKey:'',role:'ai',ov:'home',view:null,dismissed:'',animN:-1,err:'',code:'',kind:'',confirmResign:false,qStart:0};
-const NET={peer:null,lobby:null,conn:null,timer:null,qNext:null};
-const APP_VER='11.03c';
-const QSLOTS=4,QMAX=180000;let qGen=0;
-const qAlive=g=>g===qGen&&UI.ov==='searching'&&UI.kind==='quick';
+const NET={db:null,code:'',side:'',refs:[],timer:null,lastView:'',joinedAt:0};
+const APP_VER='11.03d';
+const FB_CONFIG={apiKey:"AIzaSyC7VoXmY5frEd82-emUwsBaPZLTYRjAqxM",authDomain:"bear-balance.firebaseapp.com",
+  databaseURL:"https://bear-balance-default-rtdb.europe-west1.firebasedatabase.app",projectId:"bear-balance",
+  storageBucket:"bear-balance.firebasestorage.app",messagingSenderId:"238889632553",appId:"1:238889632553:web:eb6b5c9f4108009696ed38"};
+try{if(typeof firebase!=='undefined'){firebase.initializeApp(FB_CONFIG);NET.db=firebase.database();}}catch(e){NET.db=null;}
+const netOK=()=>!!NET.db&&!window.claude;
+const SID=Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+let qGen=0;
+const LOBBY_STALE=90000;
 
+/* ===== Firebase transport =====
+   rooms/{code}/host  {name,sid}        host presence (onDisconnect removes the whole room)
+   rooms/{code}/guest {name,sid}        guest presence (onDisconnect removes it)
+   rooms/{code}/view  JSON string       latest state for the guest, written by the host
+   rooms/{code}/acts/{push} JSON string guest actions, consumed by the host
+   lobby {code,t}                       one waiting quick-match room; taken atomically by the next searcher */
+const R=p=>NET.db.ref(p);
+function listen(ref,ev,fn){ref.on(ev,fn,err=>{if(NET.refs.length)fail(errText(err));});NET.refs.push([ref,ev,fn]);}
 function update(){
-  if(UI.role==='host'&&NET.conn&&NET.conn.open){try{NET.conn.send({type:'view',v:viewFor('a')});}catch(e){}}
+  if(UI.role==='host'&&NET.side==='host'&&NET.code&&NET.started){
+    const s=JSON.stringify(viewFor('a'));
+    if(s!==NET.lastView){NET.lastView=s;R('rooms/'+NET.code+'/view').set(s).catch(()=>{});}
+  }
   render();
 }
 function act(type,c){
-  if(UI.role==='guest'){if(NET.conn&&NET.conn.open)NET.conn.send({type,c});}
+  if(UI.role==='guest'){if(NET.code)R('rooms/'+NET.code+'/acts').push(JSON.stringify({type,c:c===undefined?null:c})).catch(()=>{});}
   else apply('p',type,c);
 }
 function netReset(){
-  clearTimeout(NET.timer);qGen++;NET.qNext=null;
-  const {peer,lobby,conn}=NET;NET.peer=NET.lobby=NET.conn=null;
-  try{conn&&conn.close();}catch(e){}
-  try{lobby&&lobby.destroy();}catch(e){}
-  try{peer&&peer.destroy();}catch(e){}
-}
-function openPeer(id){
-  return new Promise((res,rej)=>{
-    let p;try{p=id?new Peer(id,{debug:0}):new Peer({debug:0});}catch(e){rej(e);return;}
-    const onErr=e=>{p.off('open',onOpen);try{p.destroy();}catch(x){}rej(e);};
-    const onOpen=()=>{p.off('error',onErr);res(p);};
-    p.once('open',onOpen);p.once('error',onErr);
-  });
+  clearTimeout(NET.timer);qGen++;
+  NET.refs.forEach(([r,e,f])=>{try{r.off(e,f);}catch(x){}});NET.refs=[];
+  const {code,side}=NET;
+  if(NET.db&&code){
+    if(side==='host'){
+      const lr=R('lobby');lr.transaction(cur=>cur&&cur.code===code?null:cur).catch(()=>{});
+      const rr=R('rooms/'+code);rr.onDisconnect().cancel().catch(()=>{});rr.remove().catch(()=>{});
+    }else if(side==='guest'){
+      const gr=R('rooms/'+code+'/guest');gr.onDisconnect().cancel().catch(()=>{});gr.remove().catch(()=>{});
+    }
+  }
+  NET.code='';NET.side='';NET.started=false;NET.lastView='';
 }
 function errText(e){
-  const t=e&&e.type;
-  const m={'peer-unavailable':['没有找到这个房间号，或房主已离开','Room not found, or the host has left'],'network':['网络连接失败，请检查网络后重试','Network error — check your connection and try again'],'server-error':['联机服务暂时不可用，请稍后再试','The online service is unavailable — try again later'],
-    'browser-incompatible':['这个浏览器不支持联机，请换用 Chrome、Edge 或 Safari','This browser can’t play online — try Chrome, Edge or Safari'],'socket-error':['联机服务连接中断','Lost connection to the online service']}[t];
-  return m?TT(m):T('联机出错：','Connection error: ')+(t||e&&e.message||T('未知错误','unknown'));
+  const c=String(e&&(e.code||e.message)||'');
+  if(/permission/i.test(c))return T('联机服务拒绝了访问（数据库规则），请联系作者','The online service refused access (database rules)');
+  if(/network|offline|unavailable/i.test(c))return T('网络连接失败，请检查网络后重试','Network error — check your connection and try again');
+  return T('联机出错：','Connection error: ')+(c||T('未知错误','unknown'));
 }
 function fail(msg){UI.canResume=false;netReset();UI.role='ai';UI.err=msg;UI.ov='home';newGame('ai');render();}
-function onPeerError(e){
-  if(UI.ov==='searching'&&UI.kind==='quick'&&e&&e.type==='peer-unavailable'){
-    qRetry(300);return;
-  }
-  if(UI.role==='host'&&NET.conn&&e&&e.type==='peer-unavailable')return;
-  fail(errText(e));
-}
-function onConnClose(c){
-  if(c!==NET.conn)return;
-  NET.conn=null;
-  if(UI.kind==='quick'&&UI.ov==='searching'){qRetry();return;}
+function opponentLeft(){
   if(UI.role==='host'||UI.role==='guest'){UI.ov='disconnected';render();}
 }
-function acceptConn(c){
-  if(NET.conn){c.on('open',()=>{try{c.send({type:'full'});}catch(e){}setTimeout(()=>{try{c.close();}catch(e){}},400);});return;}
-  NET.conn=c;UI.remoteName='';
-  if(UI.kind==='quick'){clearTimeout(NET.timer);NET.timer=setTimeout(()=>{if(NET.conn===c&&!c.open&&UI.ov==='searching')qRetry();},20000);}
-  let started=false;
-  const start=()=>{
-    if(started)return;started=true;clearTimeout(NET.timer);NET.qNext=null;
-    if(NET.lobby){try{NET.lobby.destroy();}catch(e){}NET.lobby=null;}
-    if(UI.kind==='quick'){const p=NET.peer;setTimeout(()=>{try{p&&!p.destroyed&&p.disconnect();}catch(e){}},500);}
-    UI.role='host';UI.ov=null;UI.dismissed='';UI.animN=-1;newGame('host');update();
-  };
-  /* quick match: only start once the other side proves it speaks this protocol ('hello');
-     an outdated page (cached old version) is dropped and we keep waiting for the next player */
-  const drop=()=>{if(NET.conn!==c)return;NET.conn=null;clearTimeout(NET.timer);try{c.send({type:'outdated'});}catch(e){}setTimeout(()=>{try{c.close();}catch(e){}},400);};
-  c.on('open',()=>{
-    if(UI.kind==='quick'&&UI.ov==='searching'){clearTimeout(NET.timer);NET.timer=setTimeout(drop,8000);return;}
-    start();
-  });
-  c.on('data',m=>{
-    if(!m||!m.type)return;
-    if(m.type==='hello'&&m.name)UI.remoteName=cleanName(m.name);
-    if(!started){if(m.type==='hello'){start();}else if(UI.kind==='quick')drop();return;}
-    if(m.type==='hello')update();else apply('a',m.type,m.c);
-  });
-  c.on('close',()=>onConnClose(c));
-  c.on('error',()=>{});
+/* ---- host side ---- */
+async function createRoom(){
+  for(let i=0;i<8;i++){
+    const code=genCode();
+    const res=await R('rooms/'+code+'/host').transaction(cur=>cur?undefined:{name:MYNAME,sid:SID});
+    if(res.committed){
+      NET.code=code;NET.side='host';NET.started=false;UI.code=code;
+      await R('rooms/'+code).onDisconnect().remove();
+      return code;
+    }
+  }
+  throw {code:'unavailable'};
 }
-function connectTo(id){
-  const c=NET.peer.connect(id,{reliable:true});
-  NET.conn=c;
-  clearTimeout(NET.timer);
-  NET.timer=setTimeout(()=>{if(c.open)return;if(UI.kind==='quick'&&UI.ov==='searching'){if(NET.qNext)NET.qNext();else qRetry();return;}fail(T('连接超时：房间可能已关闭，或网络不支持直连','Connection timed out: the room may be closed, or your network blocks direct connections'));},UI.kind==='quick'?16000:20000);
-  c.on('open',()=>{clearTimeout(NET.timer);UI.role='guest';UI.view=null;UI.dismissed='';UI.animN=-1;c.send({type:'hello',name:MYNAME});render();});
-  c.on('data',m=>{
-    if(!m)return;
-    if(m.type==='view'){UI.view=m.v;UI.view.recv=Date.now();if(UI.ov==='joining'||UI.ov==='searching')UI.ov=null;render();}
-    else if(m.type==='redirect'&&m.code&&UI.ov==='searching'){clearTimeout(NET.timer);NET.qNext=null;const old=NET.conn;NET.conn=null;try{old.close();}catch(e){}connectTo(PFX+m.code);}
-    else if(m.type==='outdated'){if(UI.kind==='quick'&&UI.ov==='searching')qRetry();else fail(T('对方的页面版本太旧，请双方都刷新页面后再试','The other player is on an old version — both of you refresh and try again'));}
-    else if(m.type==='full'){if(UI.kind==='quick'&&UI.ov==='searching'){UI.qFull=(UI.qFull||0)+1;if(UI.qFull>=3&&NET.qNext)NET.qNext();else qRetry(1200);}else fail(T('这个房间已经满了','This room is full'));}
+function hostListen(code,g){
+  listen(R('rooms/'+code+'/guest'),'value',snap=>{
+    if(g!==qGen)return;
+    const v=snap.val();
+    if(v&&v.sid){
+      UI.remoteName=cleanName(v.name);
+      if(!NET.started){
+        NET.started=true;clearTimeout(NET.timer);
+        if(UI.kind==='quick')R('lobby').transaction(cur=>cur&&cur.code===code?null:cur).catch(()=>{});
+        UI.role='host';UI.ov=null;UI.dismissed='';UI.animN=-1;newGame('host');
+      }
+      NET.lastView='';update();
+    }else if(NET.started){opponentLeft();}
   });
-  c.on('close',()=>onConnClose(c));
-  c.on('error',()=>{});
+  listen(R('rooms/'+code+'/acts'),'child_added',snap=>{
+    if(g!==qGen)return;
+    snap.ref.remove().catch(()=>{});
+    let m=null;try{m=JSON.parse(snap.val());}catch(e){}
+    if(NET.started&&m&&m.type)apply('a',m.type,m.c);
+  });
 }
 async function hostRoom(){
-  netReset();UI.err='';UI.kind='room';UI.ov='joining';render();
+  if(!netOK()){UI.err=T('联机组件没有加载成功，请检查网络后刷新','Online play failed to load — check your network and refresh');render();return;}
+  netReset();const g=qGen;UI.err='';UI.kind='room';UI.ov='joining';render();
   try{
-    for(let i=0;i<5&&!NET.peer;i++){
-      const code=genCode();
-      try{NET.peer=await openPeer(PFX+code);UI.code=code;}catch(e){if(e.type!=='unavailable-id')throw e;}
+    const code=await createRoom();if(g!==qGen)return;
+    hostListen(code,g);UI.ov='waiting';render();
+  }catch(e){if(g===qGen)fail(errText(e));}
+}
+/* ---- guest side ---- */
+async function enterRoom(code,g,quick){
+  const hs=await R('rooms/'+code+'/host').once('value');
+  if(g!==qGen)return 'stale';
+  if(!hs.exists())return 'missing';
+  const res=await R('rooms/'+code+'/guest').transaction(cur=>cur&&cur.sid!==SID?undefined:{name:MYNAME,sid:SID});
+  if(g!==qGen)return 'stale';
+  if(!res.committed)return 'full';
+  NET.code=code;NET.side='guest';UI.code=code;
+  await R('rooms/'+code+'/guest').onDisconnect().remove();
+  UI.role='guest';UI.view=null;UI.dismissed='';UI.animN=-1;NET.joinedAt=Date.now();
+  listen(R('rooms/'+code+'/view'),'value',snap=>{
+    if(g!==qGen)return;
+    const s=snap.val();if(!s)return;
+    try{UI.view=JSON.parse(s);UI.view.recv=Date.now();}catch(e){return;}
+    if(UI.ov==='joining'||UI.ov==='searching')UI.ov=null;
+    render();
+  });
+  listen(R('rooms/'+code+'/host'),'value',snap=>{
+    if(g!==qGen)return;
+    if(!snap.exists()){
+      if(!UI.view&&quick){quickMatch(true);return;}
+      if(!UI.view){fail(T('房主已经离开','The host has left'));return;}
+      opponentLeft();
     }
-    if(!NET.peer)throw{type:'server-error'};
-    NET.peer.on('connection',acceptConn);NET.peer.on('error',onPeerError);
-    UI.ov='waiting';render();
-  }catch(e){fail(errText(e));}
+  });
+  render();
+  return 'ok';
 }
 async function joinRoom(){
   const code=($('#codeIn')?.value||'').trim().toUpperCase();
   if(!/^[A-Z0-9]{5}$/.test(code)){UI.err=T('请输入 5 位房间号','Enter the 5-character room code');render();return;}
   if(window.claude){UI.err=T('这里不能联机，请到网页版 cccccbt.github.io/bear-balance 加入','Online play isn’t available here — open cccccbt.github.io/bear-balance');render();return;}
-  if(typeof Peer==='undefined'){UI.err=T('联机组件没有加载成功，请检查网络后刷新','Online play failed to load — check your network and refresh');render();return;}
-  netReset();UI.err='';UI.kind='room';UI.code=code;UI.ov='joining';render();
-  try{NET.peer=await openPeer();NET.peer.on('error',onPeerError);connectTo(PFX+code);}
-  catch(e){fail(errText(e));}
+  if(!netOK()){UI.err=T('联机组件没有加载成功，请检查网络后刷新','Online play failed to load — check your network and refresh');render();return;}
+  netReset();const g=qGen;UI.err='';UI.kind='room';UI.code=code;UI.ov='joining';render();
+  try{
+    const r=await enterRoom(code,g,false);
+    if(r==='missing')fail(T('没有找到这个房间号，或房主已离开','Room not found, or the host has left'));
+    else if(r==='full')fail(T('这个房间已经满了','This room is full'));
+  }catch(e){if(g===qGen)fail(errText(e));}
 }
-/* Quick match: a few lobby slots. The first searcher to claim slot k waits ON that slot's peer id,
-   and the next searcher connects straight to it as the game connection (one WebRTC link, like joining a room).
-   Once matched, the holder frees the slot (peer.disconnect keeps the live game connection).
-   A dead/ghost slot just times out and the searcher moves on; holders on a higher slot periodically
-   restart from slot 0 so two waiting players always end up meeting. */
-function qRetry(delay){
-  const g=qGen;
-  try{NET.conn&&NET.conn.close();}catch(e){}NET.conn=null;
-  setTimeout(()=>{if(g===qGen&&UI.ov==='searching'&&UI.kind==='quick')quickMatch(true);},delay||600);
-}
-function quickMatch(retry){
+/* ---- quick match ----
+   One shared lobby slot, changed only inside a transaction, so two searchers can never miss each other:
+   either the slot is empty/stale and I put my own room in it and wait, or it holds someone's room and I take it. */
+async function quickMatch(retry){
+  if(!netOK()){UI.err=T('联机组件没有加载成功，请检查网络后刷新','Online play failed to load — check your network and refresh');render();return;}
   netReset();const g=qGen;
-  if(!retry){UI.qStart=Date.now();UI.qFull=0;}
   UI.role='ai';UI.view=null;UI.err='';UI.kind='quick';UI.code='';UI.ov='searching';render();
-  if(Date.now()-UI.qStart>QMAX){fail(T('暂时没有找到对手，请稍后再试','No opponent found — try again later'));return;}
-  qSlot(g,0);
-}
-function qDropPeer(){
-  clearTimeout(NET.timer);NET.qNext=null;
-  const p=NET.peer,c=NET.conn;NET.peer=NET.conn=null;
-  try{c&&c.close();}catch(e){}try{p&&p.destroy();}catch(e){}
-}
-async function qSlot(g,k){
-  if(!qAlive(g))return;
-  qDropPeer();
-  if(k>=QSLOTS){qRetry(2000);return;}
-  let peer;
-  try{peer=await openPeer(PFX+'lobby'+k);}
-  catch(e){
-    if(!qAlive(g))return;
-    if(e.type==='unavailable-id'){qJoinSlot(g,k);return;}
-    fail(errText(e));return;
-  }
-  if(!qAlive(g)){try{peer.destroy();}catch(e){}return;}
-  NET.peer=peer;
-  peer.on('connection',acceptConn);peer.on('error',onPeerError);
-  peer.on('disconnected',()=>{if(qAlive(g)&&!NET.conn)qRetry(1500);});
-  clearTimeout(NET.timer);
-  if(k>0)NET.timer=setTimeout(()=>{if(qAlive(g)&&!NET.conn)quickMatch(true);},30000);
-}
-async function qJoinSlot(g,k){
-  let peer;
-  try{peer=await openPeer();}catch(e){if(qAlive(g))fail(errText(e));return;}
-  if(!qAlive(g)){try{peer.destroy();}catch(e){}return;}
-  NET.peer=peer;peer.on('error',onPeerError);
-  connectTo(PFX+'lobby'+k);
-  NET.qNext=()=>{NET.qNext=null;if(qAlive(g))qSlot(g,k+1);};
+  try{
+    const mine=await createRoom();if(g!==qGen)return;
+    let taken=null;
+    const res=await R('lobby').transaction(cur=>{
+      taken=null;
+      if(cur&&cur.code&&cur.code!==mine&&Date.now()-(cur.t||0)<LOBBY_STALE){taken=cur.code;return null;}
+      return {code:mine,t:Date.now()};
+    });
+    if(g!==qGen)return;
+    if(res.committed&&taken){
+      // someone was waiting: drop my own room and join theirs
+      const rr=R('rooms/'+mine);rr.onDisconnect().cancel().catch(()=>{});rr.remove().catch(()=>{});
+      NET.code='';NET.side='';
+      const r=await enterRoom(taken,g,true);
+      if(r!=='ok'&&r!=='stale'){if(g===qGen)setTimeout(()=>{if(g===qGen)quickMatch(true);},300);}
+      return;
+    }
+    // I am the one waiting: keep the lobby entry fresh until someone arrives
+    hostListen(mine,g);
+    const keep=()=>{
+      if(g!==qGen||NET.started)return;
+      R('lobby').transaction(cur=>{
+        if(!cur||cur.code===mine||Date.now()-(cur.t||0)>=LOBBY_STALE)return {code:mine,t:Date.now()};
+        return cur;
+      }).then(r=>{
+        if(g!==qGen||NET.started)return;
+        const v=r.snapshot.val();
+        if(v&&v.code!==mine){quickMatch(true);return;} // another live searcher is in the slot now: go meet them
+        NET.timer=setTimeout(keep,30000);
+      }).catch(()=>{NET.timer=setTimeout(keep,5000);});
+    };
+    NET.timer=setTimeout(keep,30000);
+  }catch(e){if(g===qGen)fail(errText(e));}
 }
 function toHome(){UI.canResume=false;netReset();UI.role='ai';UI.ov='home';UI.view=null;UI.confirmResign=false;newGame('ai');render();}
 
@@ -992,7 +1011,7 @@ function renderOverlay(V){
   const ov=$('#overlay'),d=$('#dialog'),o=overlayFor(V);
   if(!o){ov.hidden=true;lastKey='';return;}
   ov.hidden=false;
-  const inClaude=!!window.claude,netOK=typeof Peer!=='undefined'&&!inClaude;
+  const inClaude=!!window.claude,netOK=!!NET.db&&!inClaude;
   let h='',key=null,foot='',footDelay=0;
   if(o==='home'){
     h=`<div style="display:flex;align-items:center;gap:10px"><h2 style="flex:1">${T('熊之平衡','Bear Balance')}</h2><button class="btn ghost" id="langBtn2" type="button" style="font-size:13px;padding:3px 12px">${LANG==='en'?'中文':'English'}</button></div>
