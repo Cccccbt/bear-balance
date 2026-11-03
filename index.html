@@ -636,7 +636,7 @@ function connectTo(id){
     if(m.type==='view'){UI.view=m.v;UI.view.recv=Date.now();if(UI.ov==='joining'||UI.ov==='searching')UI.ov=null;render();}
     else if(m.type==='redirect'&&m.code&&UI.ov==='searching'){clearTimeout(NET.timer);NET.qNext=null;const old=NET.conn;NET.conn=null;try{old.close();}catch(e){}connectTo(PFX+m.code);}
     else if(m.type==='outdated'){if(UI.kind==='quick'&&UI.ov==='searching')qRetry();else fail(T('对方的页面版本太旧，请双方都刷新页面后再试','The other player is on an old version — both of you refresh and try again'));}
-    else if(m.type==='full'){if(UI.kind==='quick'&&UI.ov==='searching'){if(NET.qNext)NET.qNext();else qRetry();}else fail(T('这个房间已经满了','This room is full'));}
+    else if(m.type==='full'){if(UI.kind==='quick'&&UI.ov==='searching'){UI.qFull=(UI.qFull||0)+1;if(UI.qFull>=3&&NET.qNext)NET.qNext();else qRetry(1200);}else fail(T('这个房间已经满了','This room is full'));}
   });
   c.on('close',()=>onConnClose(c));
   c.on('error',()=>{});
@@ -674,7 +674,7 @@ function qRetry(delay){
 }
 function quickMatch(retry){
   netReset();const g=qGen;
-  if(!retry)UI.qStart=Date.now();
+  if(!retry){UI.qStart=Date.now();UI.qFull=0;}
   UI.role='ai';UI.view=null;UI.err='';UI.kind='quick';UI.code='';UI.ov='searching';render();
   if(Date.now()-UI.qStart>QMAX){fail(T('暂时没有找到对手，请稍后再试','No opponent found — try again later'));return;}
   qSlot(g,0);
