@@ -305,12 +305,13 @@ function setFirst(win,how){
 }
 /* 限时：调度 20 秒、出牌 40 秒。计时只在本机（人机）或房主（联机）上跑。 */
 let TMR=null;
-const T_MULL=20000,T_PLAY=40000;
+const T_MULL=20000,T_PLAY=40000,T_NEXT=4800; // 结算动画约 1.8 秒，再停 3 秒自动进入下一局
 function arm(kind,ms){clearTimeout(TMR);S.dl=Date.now()+ms;S.dlKind=kind;const g=S;TMR=setTimeout(()=>{if(S===g)onTimeout(kind);},ms);}
 function disarm(){clearTimeout(TMR);TMR=null;if(S){S.dl=null;S.dlKind=null;}}
 function onTimeout(kind){
   if(kind==='mull'&&S.phase==='mull'){for(const w of['p','a'])if(S.phase==='mull'&&!S.mdone[w]){L(w,'换牌超时，自动完成换牌');doneMull(w);}}
   else if(kind==='play'&&S.phase==='play'&&!S.pl[S.turn].passed){L(S.turn,'出牌超时');doPass(S.turn);}
+  else if(kind==='next'&&S.phase==='roundEnd')nextRound();
 }
 function L(who,t,r,pre){S.log.push({who,t,r:!!r,pre:pre||''});if(S.log.length>80)S.log.shift();}
 function draw(w,n){const p=S.pl[w];let k=0;while(k<n&&p.deck.length){p.hand.push(p.deck.pop());k++;}return k;}
@@ -445,6 +446,7 @@ function endRound(){
   const over=S.wins.p>=2||S.wins.a>=2||S.round===3;
   S.phase=over?'over':'roundEnd';
   S.ready={p:false,a:S.mode==='ai'};
+  if(!over)arm('next',T_NEXT);
   update();
 }
 function setReady(w){
@@ -454,6 +456,7 @@ function setReady(w){
   if(S.phase==='over'){newGame(S.mode);update();}else nextRound();
 }
 function nextRound(){
+  disarm();
   S.round++;S.fresh=null;
   for(const w of['p','a']){
     const p=S.pl[w];p.board=[];p.passed=false;
@@ -736,10 +739,10 @@ function render(){
   if(UI.sel!=null)st=`已选 <b>${UI.sel}</b>，再点一次这张牌确认${V.phase==='mull'?'换掉':'打出'}。`;
   if(rl&&rl.res!=='tie'&&V.round===1&&(V.phase==='mull'||V.phase==='waitMull'))st+=`<span class="note">猜拳：你出${RN[rl.p]}，对手出${RN[rl.a]}，${rl.res==='p'?'你先手':'对手先手'}。</span>`;
   if(V.note)st+=`<span class="note">${V.note}</span>`;
-  UI.dl=V.left!=null&&(V.phase==='mull'||V.phase==='waitMull'||V.phase==='play')?(V.recv||Date.now())+V.left:null;
+  UI.dl=V.left!=null&&(V.phase==='mull'||V.phase==='waitMull'||V.phase==='play'||V.phase==='roundEnd')?(V.recv||Date.now())+V.left:null;
   UI.dlMax=V.phase==='play'?40:20;
   UI.dlMine=V.phase==='mull'||(V.phase==='play'&&V.turn==='p'&&!P.passed);
-  if(UI.dl&&(UI.dlMine||online))st+=`<span class="clock" id="clock"></span>`;
+  if(UI.dl&&V.phase!=='roundEnd'&&(UI.dlMine||online))st+=`<span class="clock" id="clock"></span>`;
   $('#status').innerHTML=st;tickClock();$('#actions').innerHTML=acts;
 
   $('#oppTrack').innerHTML=Array.from({length:16},(_,i)=>i+1).map(c=>`<span class="chip ${A.played.includes(c)?'out':''}">${c}</span>`).join('');
@@ -752,6 +755,8 @@ function render(){
 }
 
 function tickClock(){
+  const an=$('#autoNext');
+  if(an&&UI.dl)an.textContent=Math.min(3,Math.max(0,Math.ceil((UI.dl-Date.now())/1000)))+' 秒后自动开始';
   const el=$('#clock');if(!el||!UI.dl)return;
   const s=Math.min(UI.dlMax||99,Math.max(0,Math.ceil((UI.dl-Date.now())/1000)));
   el.textContent=(UI.dlMine?(currentView()?.phase==='play'?'出牌剩余 ':'换牌剩余 '):'对手剩余 ')+s+' 秒';
@@ -929,8 +934,8 @@ function renderOverlay(V){
     if(o==='roundEnd'){
       const st=settleHTML(r);
       footDelay=st.dur+450;
-      foot=V.ready.p?`<p style="margin:0"><span class="spin"></span>等待对手准备…</p>`
-        :`<button class="btn" id="readyBtn" type="button">${UI.role==='ai'?'开始':'准备'}第${CN[V.round]}局</button>${V.ready.a&&UI.role!=='ai'?'<span class="muted" style="align-self:center">对手已准备</span>':''}`;
+      foot=V.ready.p?`<p style="margin:0"><span class="spin"></span><span id="autoNext">3 秒后自动开始</span></p>`
+        :`<span class="muted" id="autoNext" style="align-self:center;font-variant-numeric:tabular-nums">3 秒后自动开始</span><button class="btn" id="readyBtn" type="button">立即开始第${CN[V.round]}局</button>${V.ready.a&&UI.role!=='ai'?'<span class="muted" style="align-self:center">对手已准备</span>':''}`;
       key='re'+V.round+'-'+V.results.length;
       h=`<h2>第${CN[V.round-1]}局结算</h2>${st.html}
       <p class="muted fadein" style="margin:0;text-align:center;animation-delay:${footDelay-150}ms">总比分 你 ${V.wins.p} : ${V.wins.a} 对手 · 下一局${V.first==='p'?'你':'对手'}先手${V.round===2?' · 第三局手牌将自动打出':''}</p>`;
