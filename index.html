@@ -359,8 +359,8 @@ function nextRound(){
   for(const w of['p','a']){
     const p=S.pl[w];p.board=[];p.passed=false;
     const room=Math.max(0,10-p.hand.length),d=Math.min(3,room),got=draw(w,d);
-    p.swaps=3-d;sortHand(w);
-    const m=`抽 ${got} 张`+(p.swaps?`，${p.swaps} 次调度`:'');
+    p.swaps=2+(3-d);sortHand(w);
+    const m=`抽 ${got} 张，可换 ${p.swaps} 次`;
     S.notes[w]=`本局你${m}。`;L(w,m);
     S.mdone[w]=!(p.swaps>0&&p.deck.length);
     if(S.mdone[w])endMull(w);
@@ -642,7 +642,7 @@ const RULES=`<ul>
   <li>双方各有一副 1–16 的牌。开局抽 10 张，手牌上限 10。先手可换牌 3 次，后手 2 次，换下的牌在换牌结束前不会再抽到。</li>
   <li>先手在第一局场上直接获得 3 点。之后每局由上一局赢家先手（平局不变）。</li>
   <li>双方交替出牌，每次一张；也可以放弃跟牌。放弃后本局不能再出，对手仍可继续。</li>
-  <li>第二、三局开始时各抽 3 张；超出上限的部分变成调度（换牌）次数。</li>
+  <li>第二、三局开始时各抽 3 张，之后可换牌 2 次；抽牌超出手牌上限的部分，额外变成换牌次数。</li>
   <li>第三局所有手牌自动一次性打出。三局两胜，平局时双方都算赢这一局。</li>
 </ul>`;
 let lastDialog='';
