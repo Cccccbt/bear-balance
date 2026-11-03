@@ -570,7 +570,7 @@ function errText(e){
 function fail(msg){UI.canResume=false;netReset();UI.role='ai';UI.err=msg;UI.ov='home';newGame('ai');render();}
 function onPeerError(e){
   if(UI.ov==='searching'&&UI.kind==='quick'&&e&&e.type==='peer-unavailable'){
-    if(NET.qNext)NET.qNext();else qRetry();return;
+    qRetry(300);return;
   }
   if(UI.role==='host'&&NET.conn&&e&&e.type==='peer-unavailable')return;
   fail(errText(e));
@@ -584,10 +584,11 @@ function onConnClose(c){
 function acceptConn(c){
   if(NET.conn){c.on('open',()=>{try{c.send({type:'full'});}catch(e){}setTimeout(()=>{try{c.close();}catch(e){}},400);});return;}
   NET.conn=c;
-  if(UI.kind==='quick'){clearTimeout(NET.timer);NET.timer=setTimeout(()=>{if(NET.conn===c&&!c.open&&UI.ov==='searching')qRetry();},12000);}
+  if(UI.kind==='quick'){clearTimeout(NET.timer);NET.timer=setTimeout(()=>{if(NET.conn===c&&!c.open&&UI.ov==='searching')qRetry();},20000);}
   c.on('open',()=>{
     clearTimeout(NET.timer);NET.qNext=null;
     if(NET.lobby){try{NET.lobby.destroy();}catch(e){}NET.lobby=null;}
+    if(UI.kind==='quick'){const p=NET.peer;setTimeout(()=>{try{p&&!p.destroyed&&p.disconnect();}catch(e){}},500);}
     UI.role='host';UI.ov=null;UI.dismissed='';UI.animN=-1;newGame('host');update();
   });
   c.on('data',m=>{if(!m||!m.type)return;if(m.type==='hello')update();else apply('a',m.type,m.c);});
@@ -598,7 +599,7 @@ function connectTo(id){
   const c=NET.peer.connect(id,{reliable:true});
   NET.conn=c;
   clearTimeout(NET.timer);
-  NET.timer=setTimeout(()=>{if(c.open)return;if(UI.kind==='quick'&&UI.ov==='searching'){qRetry();return;}fail(T('连接超时：房间可能已关闭，或网络不支持直连','Connection timed out: the room may be closed, or your network blocks direct connections'));},12000);
+  NET.timer=setTimeout(()=>{if(c.open)return;if(UI.kind==='quick'&&UI.ov==='searching'){if(NET.qNext)NET.qNext();else qRetry();return;}fail(T('连接超时：房间可能已关闭，或网络不支持直连','Connection timed out: the room may be closed, or your network blocks direct connections'));},UI.kind==='quick'?16000:20000);
   c.on('open',()=>{clearTimeout(NET.timer);UI.role='guest';UI.view=null;UI.dismissed='';UI.animN=-1;c.send({type:'hello'});render();});
   c.on('data',m=>{
     if(!m)return;
@@ -629,63 +630,53 @@ async function joinRoom(){
   try{NET.peer=await openPeer();NET.peer.on('error',onPeerError);connectTo(PFX+code);}
   catch(e){fail(errText(e));}
 }
-/* Quick match: several lobby slots so one dead/ghost lobby can't block everyone.
-   Each searcher first opens its own game peer, then tries slot 0,1,2…: claim a free slot and wait,
-   or ask the slot holder for its game code. Dead slots time out and the searcher moves on;
-   holders on a higher slot periodically restart from slot 0 so two waiting players always meet. */
+/* Quick match: a few lobby slots. The first searcher to claim slot k waits ON that slot's peer id,
+   and the next searcher connects straight to it as the game connection (one WebRTC link, like joining a room).
+   Once matched, the holder frees the slot (peer.disconnect keeps the live game connection).
+   A dead/ghost slot just times out and the searcher moves on; holders on a higher slot periodically
+   restart from slot 0 so two waiting players always end up meeting. */
 function qRetry(delay){
   const g=qGen;
-  setTimeout(()=>{if(g===qGen&&UI.ov==='searching'&&UI.kind==='quick')quickMatch(true);},delay||600);
   try{NET.conn&&NET.conn.close();}catch(e){}NET.conn=null;
+  setTimeout(()=>{if(g===qGen&&UI.ov==='searching'&&UI.kind==='quick')quickMatch(true);},delay||600);
 }
-async function quickMatch(retry){
+function quickMatch(retry){
   netReset();const g=qGen;
-  if(!retry){UI.qStart=Date.now();}
-  UI.role='ai';UI.view=null;UI.err='';UI.kind='quick';UI.ov='searching';render();
+  if(!retry)UI.qStart=Date.now();
+  UI.role='ai';UI.view=null;UI.err='';UI.kind='quick';UI.code='';UI.ov='searching';render();
   if(Date.now()-UI.qStart>QMAX){fail(T('暂时没有找到对手，请稍后再试','No opponent found — try again later'));return;}
-  try{
-    let peer=null,code='';
-    for(let i=0;i<5&&!peer;i++){code=genCode();try{peer=await openPeer(PFX+code);}catch(e){if(e.type!=='unavailable-id')throw e;}}
-    if(!peer)throw{type:'server-error'};
-    if(!qAlive(g)){try{peer.destroy();}catch(e){}return;}
-    NET.peer=peer;UI.code=code;
-    peer.on('connection',acceptConn);peer.on('error',onPeerError);
-    peer.on('disconnected',()=>{if(qAlive(g))qRetry(1500);});
-    qSlot(g,0);
-  }catch(e){if(qAlive(g))fail(errText(e));}
+  qSlot(g,0);
+}
+function qDropPeer(){
+  clearTimeout(NET.timer);NET.qNext=null;
+  const p=NET.peer,c=NET.conn;NET.peer=NET.conn=null;
+  try{c&&c.close();}catch(e){}try{p&&p.destroy();}catch(e){}
 }
 async function qSlot(g,k){
   if(!qAlive(g))return;
-  if(k>=QSLOTS){qRetry(3000);return;}
-  let lobby=null;
-  try{lobby=await openPeer(PFX+'lobby'+k);}
+  qDropPeer();
+  if(k>=QSLOTS){qRetry(2000);return;}
+  let peer;
+  try{peer=await openPeer(PFX+'lobby'+k);}
   catch(e){
     if(!qAlive(g))return;
     if(e.type==='unavailable-id'){qJoinSlot(g,k);return;}
     fail(errText(e));return;
   }
-  if(!qAlive(g)){try{lobby.destroy();}catch(e){}return;}
-  NET.lobby=lobby;
-  const code=UI.code;
-  lobby.on('connection',c=>{const tell=()=>{try{c.send({type:'redirect',code});}catch(e){}};c.on('open',()=>{tell();setTimeout(()=>{try{c.close();}catch(e){}},3000);});c.on('data',tell);});
-  lobby.on('error',()=>{});
-  lobby.on('disconnected',()=>{if(qAlive(g))qRetry(1500);});
+  if(!qAlive(g)){try{peer.destroy();}catch(e){}return;}
+  NET.peer=peer;
+  peer.on('connection',acceptConn);peer.on('error',onPeerError);
+  peer.on('disconnected',()=>{if(qAlive(g)&&!NET.conn)qRetry(1500);});
   clearTimeout(NET.timer);
-  if(k>0)NET.timer=setTimeout(()=>{if(qAlive(g)&&!NET.conn)quickMatch(true);},20000);
+  if(k>0)NET.timer=setTimeout(()=>{if(qAlive(g)&&!NET.conn)quickMatch(true);},30000);
 }
-function qJoinSlot(g,k){
-  const lc=NET.peer.connect(PFX+'lobby'+k,{reliable:true});
-  let done=false;
-  const next=()=>{if(done||!qAlive(g))return;done=true;NET.qNext=null;clearTimeout(NET.timer);try{lc.close();}catch(e){}qSlot(g,k+1);};
-  NET.qNext=next;
-  clearTimeout(NET.timer);NET.timer=setTimeout(next,6000);
-  lc.on('open',()=>{try{lc.send({type:'hi'});}catch(e){}});
-  lc.on('data',m=>{
-    if(done||!qAlive(g)||!m||m.type!=='redirect'||!m.code||m.code===UI.code)return;
-    done=true;NET.qNext=null;clearTimeout(NET.timer);try{lc.close();}catch(e){}
-    connectTo(PFX+m.code);
-  });
-  lc.on('close',()=>{if(!done)setTimeout(next,300);});
+async function qJoinSlot(g,k){
+  let peer;
+  try{peer=await openPeer();}catch(e){if(qAlive(g))fail(errText(e));return;}
+  if(!qAlive(g)){try{peer.destroy();}catch(e){}return;}
+  NET.peer=peer;peer.on('error',onPeerError);
+  connectTo(PFX+'lobby'+k);
+  NET.qNext=()=>{NET.qNext=null;if(qAlive(g))qSlot(g,k+1);};
 }
 function toHome(){UI.canResume=false;netReset();UI.role='ai';UI.ov='home';UI.view=null;UI.confirmResign=false;newGame('ai');render();}
 
