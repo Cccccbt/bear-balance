@@ -112,8 +112,20 @@ button.card:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
 .status .note{display:block;color:var(--muted);font-size:12.5px}
 .status .swapleft{display:block;width:max-content;margin:0 auto 6px;padding:3px 16px;border-radius:999px;background:var(--swap);color:var(--swap-ink);font-size:15px;font-weight:600;letter-spacing:.04em}
 .status .swapleft b{font-family:var(--f-num);font-size:21px;font-weight:400;margin-inline:2px}
-.status .clock{display:block;margin-top:4px;font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-.status .clock.urgent{color:var(--bad);font-weight:600}
+.status .clock{--c:var(--honey);display:flex;align-items:center;gap:10px;width:min(320px,100%);margin:2px auto 10px;color:var(--c);font-variant-numeric:tabular-nums}
+.status .clock.mull{--c:var(--swap)}
+.status .clock.opp{--c:var(--muted)}
+.status .clock.warn{--c:var(--tie)}
+.status .clock.urgent{--c:var(--bad)}
+.clock-lbl{font-size:13px;white-space:nowrap;opacity:.9}
+.clock-bar{flex:1;height:10px;border-radius:999px;background:color-mix(in oklab,var(--c) 18%,transparent);overflow:hidden}
+.clock-bar i{display:block;height:100%;width:100%;border-radius:inherit;background:var(--c);transform-origin:left center;transition:transform .25s linear,background-color .3s}
+.clock-num{min-width:2.4em;text-align:right;font-family:var(--f-num);font-size:26px;line-height:1}
+.clock-num small{font-family:var(--f-body);font-size:12px;margin-left:1px}
+.status .clock.opp .clock-num{font-size:19px}
+.status .clock.opp .clock-bar{height:6px}
+@media (prefers-reduced-motion:no-preference){.status .clock.urgent .clock-num{animation:clockPulse 1s ease-in-out infinite}}
+@keyframes clockPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
 .actions .or,#actions .or{align-self:center;color:var(--muted);font-size:13px;padding-inline:4px}
 .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:40px}
 .btn{font:inherit;font-size:16px;padding:10px 24px;border-radius:999px;border:1.5px solid var(--honey);background:var(--honey);color:var(--honey-ink);cursor:pointer;letter-spacing:.06em}
@@ -552,7 +564,7 @@ function viewFor(me){
 /* ================= Network (Firebase Realtime Database) ================= */
 const UI={remoteName:'',oppLabel:'',prevHand:null,prevBoard:{p:0,a:0},rpsSeen:null,sel:null,selKey:'',role:'ai',ov:'home',view:null,dismissed:'',animN:-1,err:'',code:'',kind:'',confirmResign:false,qStart:0};
 const NET={db:null,code:'',side:'',refs:[],timer:null,lastView:'',joinedAt:0};
-const APP_VER='11.03d';
+const APP_VER='11.03e';
 const FB_CONFIG={apiKey:"AIzaSyC7VoXmY5frEd82-emUwsBaPZLTYRjAqxM",authDomain:"bear-balance.firebaseapp.com",
   databaseURL:"https://bear-balance-default-rtdb.europe-west1.firebasedatabase.app",projectId:"bear-balance",
   storageBucket:"bear-balance.firebasestorage.app",messagingSenderId:"238889632553",appId:"1:238889632553:web:eb6b5c9f4108009696ed38"};
@@ -848,7 +860,7 @@ function render(){
   UI.dl=V.left!=null&&(V.phase==='mull'||V.phase==='waitMull'||V.phase==='play'||V.phase==='roundEnd')?(V.recv||Date.now())+V.left:null;
   UI.dlMax=V.phase==='play'?40:20;
   UI.dlMine=V.phase==='mull'||(V.phase==='play'&&V.turn==='p'&&!P.passed);
-  if(UI.dl&&V.phase!=='roundEnd'&&(UI.dlMine||online))st+=`<span class="clock" id="clock"></span>`;
+  if(UI.dl&&V.phase!=='roundEnd'&&(UI.dlMine||online))st=`<span class="clock" id="clock" role="timer"><span class="clock-lbl"></span><span class="clock-bar"><i></i></span><span class="clock-num"></span></span>`+st;
   $('#status').innerHTML=st;tickClock();$('#actions').innerHTML=acts;
 
   $('#oppTrack').innerHTML=Array.from({length:16},(_,i)=>i+1).map(c=>`<span class="chip ${A.played.includes(c)?'out':''}">${c}</span>`).join('');
@@ -864,11 +876,18 @@ function tickClock(){
   const an=$('#autoNext');
   if(an&&UI.dl)an.textContent=Math.min(3,Math.max(0,Math.ceil((UI.dl-Date.now())/1000)))+T(' 秒后自动开始','s until next round');
   const el=$('#clock');if(!el||!UI.dl)return;
-  const s=Math.min(UI.dlMax||99,Math.max(0,Math.ceil((UI.dl-Date.now())/1000)));
-  el.textContent=(UI.dlMine?(currentView()?.phase==='play'?T('出牌剩余 ','Time to play: '):T('换牌剩余 ','Time to swap: ')):T('对手剩余 ','Opponent’s time: '))+s+T(' 秒','s');
-  el.classList.toggle('urgent',UI.dlMine&&s<=5);
+  const max=(UI.dlMax||20)*1000,ms=Math.min(max,Math.max(0,UI.dl-Date.now())),s=Math.ceil(ms/1000);
+  const ph=currentView()?.phase,mull=ph==='mull'||ph==='waitMull';
+  const lbl=UI.dlMine?(mull?T('换牌','Swap'):T('出牌','Play')):T('对手','Opp.');
+  const L=el.querySelector('.clock-lbl'),N=el.querySelector('.clock-num'),B=el.querySelector('.clock-bar i');
+  if(L.textContent!==lbl)L.textContent=lbl;
+  const nt=s+'<small>'+T('秒','s')+'</small>';if(N.innerHTML!==nt)N.innerHTML=nt;
+  B.style.transform=`scaleX(${(ms/max).toFixed(3)})`;
+  const cls='clock'+(mull?' mull':'')+(!UI.dlMine?' opp':'')+(UI.dlMine&&s<=5?' urgent':UI.dlMine&&s<=10?' warn':'');
+  if(el.className!==cls)el.className=cls;
+  el.setAttribute('aria-label',lbl+' '+s+T('秒','s'));
 }
-setInterval(tickClock,250);
+setInterval(tickClock,200);
 
 /* ================= Motion ================= */
 const reduced=()=>window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
