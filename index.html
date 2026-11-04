@@ -137,6 +137,8 @@ button.card:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
 .btn:hover{filter:brightness(1.08)}
 .btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 
+.confirm-slot{display:flex;justify-content:center;padding-top:14px}
+.confirm-slot:empty{display:none}
 .aside{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 .chip{font-family:var(--f-num);font-size:14px;min-width:28px;text-align:center;padding:1px 4px;border-radius:5px;border:1px solid var(--rail-2);color:var(--ink);font-variant-numeric:tabular-nums}
 .chip.out{opacity:.28;text-decoration:line-through}
@@ -269,6 +271,7 @@ details.panel summary{cursor:pointer;font-size:13px;letter-spacing:.1em;color:va
     </div>
     <div class="aside" id="aside" hidden></div>
     <div class="hand" id="hand"></div>
+    <div class="confirm-slot" id="confirmSlot"></div>
   </section>
 
   <div class="info">
@@ -568,7 +571,7 @@ function viewFor(me){
 /* ================= Network (Firebase Realtime Database) ================= */
 const UI={remoteName:'',oppLabel:'',prevHand:null,prevBoard:{p:0,a:0},rpsSeen:null,sel:null,selKey:'',role:'ai',ov:'home',view:null,dismissed:'',animN:-1,err:'',code:'',kind:'',confirmResign:false,qStart:0};
 const NET={db:null,code:'',side:'',refs:[],timer:null,lastView:'',joinedAt:0};
-const APP_VER='11.03f';
+const APP_VER='11.03g';
 const FB_CONFIG={apiKey:"AIzaSyC7VoXmY5frEd82-emUwsBaPZLTYRjAqxM",authDomain:"bear-balance.firebaseapp.com",
   databaseURL:"https://bear-balance-default-rtdb.europe-west1.firebasedatabase.app",projectId:"bear-balance",
   storageBucket:"bear-balance.firebasestorage.app",messagingSenderId:"238889632553",appId:"1:238889632553:web:eb6b5c9f4108009696ed38"};
@@ -823,6 +826,7 @@ function render(){
   const hand=$('#hand');
   hand.className='hand'+(V.phase==='mull'?' mull':'')+(!canSwap&&!canPlay?' idle':'');
   hand.innerHTML=P.hand.map(c=>cardHTML(c,{btn:true,sel:c===UI.sel,disabled:!(canSwap||canPlay),label:V.phase==='mull'?T('换掉 ','Swap '):T('打出 ','Play '),badge:V.phase==='mull'?T('换','⇄'):T('出','↑')})).join('')||`<span class="muted">${T('没有手牌','No cards')}</span>`;
+  {const cs=$('#confirmSlot'),ch=canSwap?confirmBtn('mull'):canPlay?confirmBtn('play'):'';if(cs.innerHTML!==ch)cs.innerHTML=ch;}
   const aside=$('#aside');
   aside.hidden=!(V.phase==='mull'&&P.aside.length);
   aside.innerHTML=T('已换下（换牌结束后洗回牌库）：','Set aside (shuffled back after swapping): ')+P.aside.map(c=>`<span class="chip set">${c}</span>`).join('');
@@ -847,18 +851,18 @@ function render(){
   }else if(V.phase==='waitRps'){
     st=`<span class="spin"></span>${T(`你出了${rpsN(V.rpsMine)}，等待对手出拳…`,`You threw ${rpsN(V.rpsMine)}. Waiting for your opponent…`)}`;
   }else if(V.phase==='mull'){
-    st=P.deck.length?`<span class="swapleft">${T(`剩余换牌 <b>${P.swaps}</b> 次`,`Swaps left: <b>${P.swaps}</b>`)}</span>${T('选一张想换掉的牌，点「确认换牌」（或双击这张牌）。换下的牌在换牌结束前不会再抽到，次数用完自动完成换牌。','Pick a card and press “Confirm swap” (or double-tap it). Swapped-out cards won’t come back until swapping ends; it finishes automatically when you run out.')}`:T('牌库已空，无法换牌。','Your deck is empty — no swaps possible.');
-    acts=(canSwap?confirmBtn('mull'):'')+`<button class="btn ${canSwap?'ghost':''}" id="doneMull" type="button">${T('完成换牌','Done swapping')}</button>`;
+    st=P.deck.length?`<span class="swapleft">${T(`剩余换牌 <b>${P.swaps}</b> 次`,`Swaps left: <b>${P.swaps}</b>`)}</span>${T('选一张想换掉的牌，点手牌下方的「确认换牌」（或双击这张牌）。换下的牌在换牌结束前不会再抽到，次数用完自动完成换牌。','Pick a card and press “Confirm swap” (or double-tap it). Swapped-out cards won’t come back until swapping ends; it finishes automatically when you run out.')}`:T('牌库已空，无法换牌。','Your deck is empty — no swaps possible.');
+    acts=`<button class="btn" id="doneMull" type="button">${T('完成换牌','Done swapping')}</button>`;
   }else if(V.phase==='waitMull')st=`<span class="spin"></span>${T('等待对手完成换牌…','Waiting for your opponent to finish swapping…')}`;
   else if(V.phase==='play'){
-    if(V.turn==='p')st=A.passed?T('对手已放弃。你可以继续出牌，或放弃结束本局。','Your opponent passed. Keep playing, or pass to end the round.'):T('轮到你：选一张牌后点「确认出牌」（或双击这张牌），也可以放弃跟牌。','Your turn: pick a card and press “Confirm play” (or double-tap it), or pass.');
+    if(V.turn==='p')st=A.passed?T('对手已放弃。你可以继续出牌，或放弃结束本局。','Your opponent passed. Keep playing, or pass to end the round.'):T('轮到你：选一张牌，点手牌下方的「确认出牌」（或双击这张牌），也可以放弃跟牌。','Your turn: pick a card and press “Confirm play” (or double-tap it), or pass.');
     else st=P.passed?T('你已放弃，对手还可以继续出牌…','You passed; your opponent can keep playing…'):(V.mode==='ai'?T('对手思考中…','Opponent is thinking…'):`<span class="spin"></span>${T('等待对手出牌…','Waiting for your opponent…')}`);
-    if(canPlay)acts=confirmBtn('play')+`<button class="btn ghost" id="passBtn" type="button">${T('放弃跟牌','Pass')}</button>`;
+    if(canPlay)acts=`<button class="btn ghost" id="passBtn" type="button">${T('放弃跟牌','Pass')}</button>`;
   }else if(V.phase==='auto')st=T(`第${CN[V.round-1]}局是决胜局：双方所有手牌一次性自动打出。`,`Round ${V.round} is the decider: every card in both hands is played automatically.`);
   else if(V.phase==='roundEnd'||V.phase==='over')st=T('本局结束。','Round over.');
   if(online&&!['over','wait','rps','waitRps'].includes(V.phase))acts+=`<button class="btn ghost" id="resign" type="button">${UI.confirmResign?T('确认认输','Confirm resign'):T('认输','Resign')}</button>`;
   if(V.phase==='over'&&!overlayFor(V))acts=`<button class="btn" id="readyBtn" type="button" ${V.ready.p?'disabled':''}>${V.ready.p?T('等待对手…','Waiting…'):T('再来一局','Play again')}</button>`;
-  if(UI.sel!=null)st=(st.match(/^<span class="clock"[\s\S]*?<\/span><\/span>/)||[''])[0]+T(`已选 <b>${UI.sel}</b>：点下方「${V.phase==='mull'?'确认换牌':'确认出牌'}」，或再点一次这张牌。`,`Selected <b>${UI.sel}</b> — press “${V.phase==='mull'?'Confirm swap':'Confirm play'}” below, or tap the card again.`);
+  if(UI.sel!=null)st=(st.match(/^<span class="clock"[\s\S]*?<\/span><\/span>/)||[''])[0]+T(`已选 <b>${UI.sel}</b>：点手牌下方的「${V.phase==='mull'?'确认换牌':'确认出牌'}」，或再点一次这张牌。`,`Selected <b>${UI.sel}</b> — press “${V.phase==='mull'?'Confirm swap':'Confirm play'}” under your hand, or tap the card again.`);
   if(rl&&rl.res!=='tie'&&V.round===1&&(V.phase==='mull'||V.phase==='waitMull'))st+=`<span class="note">${T(`猜拳：你出${rpsN(rl.p)}，对手出${rpsN(rl.a)}，${rl.res==='p'?'你先手':'对手先手'}。`,`RPS: you ${rpsN(rl.p)}, opponent ${rpsN(rl.a)} — ${rl.res==='p'?'you go first':'opponent goes first'}.`)}</span>`;
   if(V.note)st+=`<span class="note">${TT(V.note)}</span>`;
   UI.dl=V.left!=null&&(V.phase==='mull'||V.phase==='waitMull'||V.phase==='play'||V.phase==='roundEnd')?(V.recv||Date.now())+V.left:null;
